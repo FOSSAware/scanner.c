@@ -608,12 +608,15 @@ void scanner_wfp_capture(char *path, char **md5, char *wfp_buffer)
     long length = 0;
     char *src = read_file(path, &length);
     //no external memory parameter, normal execution
-    if (md5 == NULL && !(length < MIN_FILE_SIZE || unwanted_header(src)))
+    if (md5 == NULL)
     {
-       /* Calculate MD5 */
-        uint8_t bin_md5[16] = "\0";
-        MD5((uint8_t *)src, length, bin_md5);
-        hex_md5 = bin_to_hex(bin_md5, 16);
+        if (length > MIN_FILE_SIZE && !unwanted_header(src))
+        {
+        /* Calculate MD5 */
+            uint8_t bin_md5[16] = "\0";
+            MD5((uint8_t *)src, length, bin_md5);
+            hex_md5 = bin_to_hex(bin_md5, 16);
+        }
     }
     //external reference, but null. Reserve memory and calc md5.
     else if (*md5 == NULL)
