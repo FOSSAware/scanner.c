@@ -29,7 +29,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define VERSION "1.2.6"
+#define VERSION "1.2.7"
 #define MAX_HEADER_LEN 1024 * 1024 * 1024 * 10
 #define MAX_FILE_SIZE (1024 * 1024 * 4)
 #define MIN_FILE_SIZE 256
@@ -119,7 +119,9 @@ void scanner_set_output(scanner_object_t *s, char * f);
 int scanner_print_output(scanner_object_t *scanner);
 void scanner_set_log_file(char *log);
 scanner_object_t * scanner_create(char * id, char * host, char * port, char * session, char * format, char * path, char * file, scanner_evt_handler callback);
+void scanner_wfp_capture(char *path, char **md5, char *wfp_buffer);
 int scanner_recursive_scan(scanner_object_t *scanner);
+int scanner_wfp_scan(scanner_object_t * scanner);
 bool scanner_umz(char * md5);
 int scanner_get_file_contents(scanner_object_t *scanner, char * hash);
 void scanner_object_free(scanner_object_t * scanner);

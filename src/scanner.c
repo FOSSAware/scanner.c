@@ -94,75 +94,11 @@ static char *read_file(char *path, long *length)
     return src;
 }
 
-
 static long millis()
 {
     struct timespec _t;
     clock_gettime(CLOCK_REALTIME, &_t);
     return _t.tv_sec*1000 + lround(_t.tv_nsec/1.0e6);
-}
-
-static void wfp_capture(scanner_object_t *scanner, char *path, char *wfp_buffer)
-{
-    /* Skip unwanted extensions */
-    long length = 0;
-    char *src = read_file(path, &length);
-
-    scanner->status.state = SCANNER_STATE_WFP_CALC; //update scanner state
-
-    /* Skip if file is under threshold or if content is not wanted*/
-    if (length < MIN_FILE_SIZE || unwanted_header(src))
-    {
-        free(src);
-        return;
-    }
-
-    /* Calculate MD5 */
-    uint8_t bin_md5[16] = "\0";
-    MD5((uint8_t *)src, length, bin_md5);
-    char *hex_md5 = bin_to_hex(bin_md5, 16);
-
-    /* Save file information to buffer */
-    sprintf(wfp_buffer + strlen(wfp_buffer), "file=%s,%lu,%s\n", hex_md5, length, path);
-    free(hex_md5);
-    scanner->status.wfp_files++; //update scanner proc. files
-    
-
-    /* If it is not binary (chr(0) found), calculate snippet wfps */
-    if (strlen(src) == length && length < MAX_FILE_SIZE)
-    {
-        /* Capture hashes (Winnowing) */
-        uint32_t *hashes = malloc(MAX_FILE_SIZE);
-        uint32_t *lines = malloc(MAX_FILE_SIZE);
-        uint32_t last_line = 0;
-
-        /* Calculate hashes */
-        uint32_t size = winnowing(src, hashes, lines, MAX_FILE_SIZE);
-
-        /* Write hashes to buffer */
-        for (int i = 0; i < size; i++)
-        {
-            if (last_line != lines[i])
-            {
-                if (last_line != 0)
-                    strcat(wfp_buffer, "\n");
-                sprintf(wfp_buffer + strlen(wfp_buffer), "%d=%08x", lines[i], hashes[i]);
-                last_line = lines[i];
-            }
-            else
-                sprintf(wfp_buffer + strlen(wfp_buffer), ",%08x", hashes[i]);
-        }
-        strcat(wfp_buffer, "\n");
-        free(hashes);
-        free(lines);
-        
-        if (scanner->callback && scanner->status.wfp_files % 100 == 0)
-        {
-            scanner->callback(&scanner->status,SCANNER_EVT_WFP_CALC_IT);
-        }  
-            
-    }
-    free(src);
 }
 
 static bool scanner_is_dir(char *path)
@@ -204,16 +140,18 @@ static bool scanner_file_proc(scanner_object_t *s,char *path)
     }
 
     wfp_buffer = calloc(MAX_FILE_SIZE, 1);
-
     *wfp_buffer = 0;
-
-    wfp_capture(s,path, wfp_buffer);
+    
+    s->status.state = SCANNER_STATE_WFP_CALC; //update scanner state
+    scanner_wfp_capture(path,NULL, wfp_buffer);
+    
     if (*wfp_buffer)
     {
         FILE *wfp_f = fopen(s->wfp_path, "a+");
         fprintf(wfp_f, "%s", wfp_buffer);
         fclose(wfp_f);
         state = false;
+        s->status.wfp_files++; //update scanner proc. files
     }
     else
     {
@@ -221,6 +159,10 @@ static bool scanner_file_proc(scanner_object_t *s,char *path)
     }
 
     free(wfp_buffer);
+
+    if (s->callback && s->status.wfp_files % 100 == 0)
+        s->callback(&s->status,SCANNER_EVT_WFP_CALC_IT);
+    
     return state;
 }
 
@@ -298,6 +240,23 @@ void json_correct(char * target)
     free(replacement);
 }
 
+static uint wfp_files_count(scanner_object_t *s)
+{
+    const char file_key[] = "file=";
+    long buffer_size = 0; //size of wfp file
+    char *wfp_buffer = read_file(s->wfp_path, &buffer_size);
+    char *found =  strstr(wfp_buffer,file_key);;
+    uint count = 0;
+    while(found)
+    {
+        found += strlen(file_key);
+        found = strstr(found,file_key);
+        count++;
+    }
+    free(wfp_buffer);
+    s->status.wfp_files = count;
+    return count;
+}
 
 static bool scan_request_by_chunks(scanner_object_t *s)
 {
@@ -409,7 +368,6 @@ static bool scan_request_by_chunks(scanner_object_t *s)
         s->callback(&s->status,SCANNER_EVT_CHUNK_PROC_END);
     }
     
-    free(s->wfp_path);  
     s->status.state = SCANNER_STATE_OK;
     return state;
 
@@ -640,9 +598,78 @@ void scanner_set_output(scanner_object_t * e, char * f)
     else
         e->output_path = f;
 
-    asprintf(&e->wfp_path,"%s.wfp",e->output_path);
     e->output = fopen(e->output_path, "w+");
     log_debug("ID: %s -File open: %s", e->status.id, e->output_path);
+}
+
+void scanner_wfp_capture(char *path, char **md5, char *wfp_buffer)
+{
+    char *hex_md5 = NULL;
+    long length = 0;
+    char *src = read_file(path, &length);
+    //no external memory parameter, normal execution
+    if (md5 == NULL && !(length < MIN_FILE_SIZE || unwanted_header(src)))
+    {
+       /* Calculate MD5 */
+        uint8_t bin_md5[16] = "\0";
+        MD5((uint8_t *)src, length, bin_md5);
+        hex_md5 = bin_to_hex(bin_md5, 16);
+    }
+    //external reference, but null. Reserve memory and calc md5.
+    else if (*md5 == NULL)
+    {
+        /* Calculate MD5 */
+        uint8_t bin_md5[16] = "\0";
+        MD5((uint8_t *)src, length, bin_md5);
+        hex_md5 = bin_to_hex(bin_md5, 16);
+        *md5 = strdup(hex_md5);
+    }
+    //external md5, use it
+    else
+    {
+        hex_md5 = *md5;
+    }
+
+    /* Skip if file is under threshold or if content is not wanted*/
+    if (length < MIN_FILE_SIZE || unwanted_header(src))
+    {
+       free(src);
+       return;
+    }
+
+    /* Save file information to buffer */
+    sprintf(wfp_buffer + strlen(wfp_buffer), "file=%s,%lu,%s\n", hex_md5, length, path);
+    free(hex_md5);
+
+    /* If it is not binary (chr(0) found), calculate snippet wfps */
+    if (strlen(src) == length && length < MAX_FILE_SIZE)
+    {
+        /* Capture hashes (Winnowing) */
+        uint32_t *hashes = malloc(MAX_FILE_SIZE);
+        uint32_t *lines = malloc(MAX_FILE_SIZE);
+        uint32_t last_line = 0;
+
+        /* Calculate hashes */
+        uint32_t size = winnowing(src, hashes, lines, MAX_FILE_SIZE);
+
+        /* Write hashes to buffer */
+        for (int i = 0; i < size; i++)
+        {
+            if (last_line != lines[i])
+            {
+                if (last_line != 0)
+                    strcat(wfp_buffer, "\n");
+                sprintf(wfp_buffer + strlen(wfp_buffer), "%d=%08x", lines[i], hashes[i]);
+                last_line = lines[i];
+            }
+            else
+                sprintf(wfp_buffer + strlen(wfp_buffer), ",%08x", hashes[i]);
+        }
+        strcat(wfp_buffer, "\n");
+        free(hashes);
+        free(lines);           
+    }
+    free(src);
 }
 
 int scanner_recursive_scan(scanner_object_t * scanner)
@@ -657,8 +684,11 @@ int scanner_recursive_scan(scanner_object_t * scanner)
     scanner->status.wfp_total_time = millis();    
     scanner->status.last_chunk_response_time = 0;
     scanner->status.total_response_time = 0;
+    asprintf(&scanner->wfp_path,"%s.wfp",scanner->output_path);
+
     strcpy(scanner->status.message, "WFP_CALC_START\0");
     log_debug("ID: %s - Scan start - WFP Calculation", scanner->status.id);
+    
     if (scanner->callback)
     {
         scanner->callback(&scanner->status,SCANNER_EVT_START);
@@ -701,6 +731,7 @@ int scanner_recursive_scan(scanner_object_t * scanner)
 
     strcpy(scanner->status.message, "WFP_CALC_END\0"); 
     scan_request_by_chunks(scanner);
+    free(scanner->wfp_path);  
 
     if (scanner->output)
         fclose(scanner->output);
@@ -713,6 +744,53 @@ int scanner_recursive_scan(scanner_object_t * scanner)
 
     return scanner->status.state;
 }
+
+int scanner_wfp_scan(scanner_object_t * scanner)
+{
+    if (!scanner)
+    {
+        log_fatal("Scanner object need to proceed");
+    }
+    scanner->status.state = SCANNER_STATE_INIT;
+    scanner->status.wfp_files = 0;
+    scanner->status.scanned_files = 0;
+    scanner->status.wfp_total_time = millis();    
+    scanner->status.last_chunk_response_time = 0;
+    scanner->status.total_response_time = 0;
+
+    if(!scanner_is_file(scanner->scan_path))
+    {
+        log_debug("wfp_scan only works with wfp files");
+        return SCANNER_STATE_ERROR;
+    }
+
+    scanner->wfp_path = scanner->scan_path;
+    
+    if (wfp_files_count(scanner) == 0)
+        return SCANNER_STATE_ERROR;
+
+    strcpy(scanner->status.message, "WFP_PROC_START\0");
+    log_debug("ID: %s - Scan start - Scanning WFP file by chunks", scanner->status.id);
+    if (scanner->callback)
+    {
+        scanner->callback(&scanner->status,SCANNER_EVT_CHUNK_PROC);
+    }
+
+     scan_request_by_chunks(scanner);
+
+    if (scanner->output)
+        fclose(scanner->output);
+
+    if (scanner->callback)
+    {
+        scanner->callback(&scanner->status,SCANNER_EVT_END);
+    }
+    strcpy(scanner->status.message, "FINISHED\0");
+
+    return scanner->status.state; 
+    
+}
+
 
 int scanner_get_file_contents(scanner_object_t *scanner, char * hash)
 { 
@@ -760,13 +838,13 @@ int scanner_print_output(scanner_object_t *scanner)
 }
 scanner_object_t * scanner_create(char * id, char * host, char * port, char * session, char * format, char * path, char * file, scanner_evt_handler callback)
 {
-     scanner_object_t *scanner = calloc(1, sizeof(scanner_object_t));
-     scanner_object_t init = __SCANNER_OBJECT_INIT(path,file);
-     init.callback = callback;
-     strncpy(init.status.id, id, MAX_ID_LEN);
+    scanner_object_t *scanner = calloc(1, sizeof(scanner_object_t));
+    scanner_object_t init = __SCANNER_OBJECT_INIT(path,file);
+    init.callback = callback;
+    strncpy(init.status.id, id, MAX_ID_LEN);
 
      //copy default config
-     memcpy(scanner,&init,sizeof(scanner_object_t));
+    memcpy(scanner,&init,sizeof(scanner_object_t));
 
     scanner_set_output(scanner, file);
     scanner_set_host(scanner, host);
@@ -776,6 +854,7 @@ scanner_object_t * scanner_create(char * id, char * host, char * port, char * se
     strcpy(scanner->status.message, "SCANNER_CREATED\0");
     return scanner;
 }
+
 
 void scanner_object_free(scanner_object_t * scanner)
 {

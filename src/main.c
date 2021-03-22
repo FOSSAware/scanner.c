@@ -61,6 +61,7 @@ int main(int argc, char *argv[])
 {
     int param = 0;
     bool print_output = true;
+    bool wfp_mode = false;
     char * file = NULL;
     char format[20] = "plain";
     char host[32] = API_HOST_DEFAULT;
@@ -68,7 +69,7 @@ int main(int argc, char *argv[])
     char session[64] = API_SESSION_DEFAULT;
     char path[512];
 
-    while ((param = getopt (argc, argv, "F:H:p:f:o:l:hdt")) != -1)
+    while ((param = getopt (argc, argv, "F:H:p:f:o:l:whdt")) != -1)
         switch (param)
         {
             case 'H':
@@ -95,6 +96,9 @@ int main(int argc, char *argv[])
             case 'F':
                 exit(scanner_umz(optarg));
                 break;
+            case 'w':
+                wfp_mode = true;
+                break;
             case 'h':
             default:
                 fprintf(stderr, "SCANOSS scanner-%s\n", VERSION);
@@ -103,6 +107,7 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "-h\t\t Show this help\n");
                 fprintf(stderr, "-f<format>\t Output format, could be: plain (default), spdx, spdx_xml or cyclonedx.\n");
                 fprintf(stderr, "-F<md5>\t UMZ a MD5 hash\n");
+                fprintf(stderr, "-w\t Scan a wfp file\n");
                 fprintf(stderr, "-o<file_name>\t Save the scan results in the specified file\n");
                 fprintf(stderr, "-l<file_name>\t Set logs filename\n");
                 fprintf(stderr, "-d\t\t Enable debug messages\n");
@@ -118,13 +123,20 @@ int main(int argc, char *argv[])
         char id[MAX_ID_LEN];
         sprintf(id,"scanoss CLI,%u", rand());
         scanner_object_t * scanner = scanner_create(id, host,port,session,format,path,file, scanner_evt);
-        scanner_recursive_scan(scanner);
+        int err = EXIT_SUCCESS;
+        if (wfp_mode)
+            err = scanner_wfp_scan(scanner);
+        else
+            err = scanner_recursive_scan(scanner);
     
         if (print_output)
             scanner_print_output(scanner);
 
         scanner_object_free(scanner);
-        return EXIT_SUCCESS;
+
+        if (err)
+            fprintf(stderr, "Scanner failed, error %d\n", err);
+        return err;
     }
     fprintf(stderr, "Missing parameter, run with -h for help\n");
     return EXIT_FAILURE;
