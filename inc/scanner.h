@@ -29,7 +29,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define VERSION "1.2.8"
+#define VERSION "1.2.9"
 #define MAX_HEADER_LEN 1024 * 1024 * 1024 * 10
 #define MAX_FILE_SIZE (1024 * 1024 * 4)
 #define MIN_FILE_SIZE 256
@@ -42,6 +42,20 @@ enum
     API_REQ_GET,
     API_REQ_POST
 };
+
+typedef enum
+{
+    SCANNER_FLAG_DISABLE_SNIPPET_MATCHING = 1,
+    SCANNER_FLAG_ENABLE_SNIPPET_ID = 1<<1,
+    SCANNER_FLAG_DISABLE_DEPENDENCIES = 1<<2,
+    SCANNER_FLAG_DISABLE_LICENSES = 1<<3,
+    SCANNER_FLAG_DISABLE_COPYRIGHTS = 1<<4,
+    SCANNER_FLAG_DISABLE_VULNERABILITIES = 1<<5,
+    SCANNER_FLAG_DISABLE_QUALITY = 1<<6,
+    SCANNER_FLAG_DISABLE_CRIPTOGRAPHY = 1<<7,  
+    SCANNER_FLAG_DISABLE_BEST_MATCH_ONLY= 1<<8,
+    SCANNER_FLAG_DEFAULT = 0,
+} scanner_flags_t;
 
 typedef enum
 {
@@ -97,6 +111,7 @@ typedef struct scanner_object_t
     char *wfp_path;
     FILE *output;
     unsigned int files_chunk_size;
+    scanner_flags_t flags;
     scanner_status_t status;
     scanner_evt_handler callback;
 } scanner_object_t;
@@ -106,7 +121,8 @@ typedef struct scanner_object_t
 #define API_SESSION_DEFAULT "\0"
 #define DEFAULT_FILES_CHUNK 100
 
-#define __SCANNER_OBJECT_INIT(path,file) {.API_host = API_HOST_DEFAULT, .API_port = API_PORT_DEFAULT, .API_session = API_SESSION_DEFAULT, .format = "plain", .files_chunk_size = DEFAULT_FILES_CHUNK,.scan_path = path, .output_path = file, .status.state = SCANNER_STATE_INIT, .callback = NULL}
+#define __SCANNER_OBJECT_INIT(path,file) {.API_host = API_HOST_DEFAULT, .API_port = API_PORT_DEFAULT, .API_session = API_SESSION_DEFAULT, .format = "plain", .files_chunk_size = DEFAULT_FILES_CHUNK,.scan_path = path, .output_path = file, .status.state = SCANNER_STATE_INIT, .flags = SCANNER_FLAG_DEFAULT , .callback = NULL,\
+                                            .status.component_last="none"}
 
 void scanner_set_log_level(int level);
 void scanner_set_verbose(bool in);
@@ -118,11 +134,11 @@ void scanner_set_session(scanner_object_t *s, char *session);
 void scanner_set_output(scanner_object_t *s, char * f);
 int scanner_print_output(scanner_object_t *scanner);
 void scanner_set_log_file(char *log);
-scanner_object_t * scanner_create(char * id, char * host, char * port, char * session, char * format, char * path, char * file, scanner_evt_handler callback);
+scanner_object_t * scanner_create(char * id, char * host, char * port, char * session, char * format, char * path, char * file, scanner_flags_t flag, scanner_evt_handler callback);
 void scanner_wfp_capture(char *path, char **md5, char *wfp_buffer);
 int scanner_recursive_scan(scanner_object_t *scanner);
 int scanner_wfp_scan(scanner_object_t * scanner);
-bool scanner_umz(char * md5);
+bool scanner_get_attribution(scanner_object_t *scanner, char * path);
 int scanner_get_file_contents(scanner_object_t *scanner, char * hash);
 void scanner_object_free(scanner_object_t * scanner);
 #endif

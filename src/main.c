@@ -29,6 +29,14 @@
 #include <sys/stat.h>
 #include "scanner.h"
 
+enum
+{
+    SCAN = 0,
+    SCAN_WFP,
+    UMZ,
+    ATT_NOTICES,
+};
+
 void scanner_evt(const scanner_status_t * p_scanner, scanner_evt_t evt)
 {
  switch(evt)
@@ -59,26 +67,33 @@ void scanner_evt(const scanner_status_t * p_scanner, scanner_evt_t evt)
 
 int main(int argc, char *argv[])
 {
+    int proc = SCAN;
     int param = 0;
     bool print_output = true;
-    bool wfp_mode = false;
     char * file = NULL;
     char format[20] = "plain";
     char host[32] = API_HOST_DEFAULT;
     char port[5] = API_PORT_DEFAULT;
     char session[64] = API_SESSION_DEFAULT;
     char path[512];
+    int flags = 0;
 
-    while ((param = getopt (argc, argv, "F:H:p:f:o:l:whdt")) != -1)
+    while ((param = getopt (argc, argv, "F:H:p:f:o:l:auwhdt")) != -1)
         switch (param)
         {
+            case 'a':
+                proc = ATT_NOTICES;
+                break;
+            case 'F':
+                flags = atol(optarg);
+                break;
             case 'H':
                 strcpy(host,optarg);
                 break;
             case 'p':
                 strcpy(port,optarg);
                 break;
-            case 'f':
+            case 'O':
                 strcpy(format,optarg);
                 break;
             case 'o':
@@ -93,11 +108,11 @@ int main(int argc, char *argv[])
             case 't':
                 scanner_set_log_level(0);
                 break;
-            case 'F':
-                exit(scanner_umz(optarg));
+            case 'u':
+                proc = UMZ;
                 break;
             case 'w':
-                wfp_mode = true;
+                proc = SCAN_WFP;
                 break;
             case 'h':
             default:
@@ -105,9 +120,11 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "Usage: scanner FILE or scanner DIR\n");
                 fprintf(stderr, "Option\t\t Meaning\n");
                 fprintf(stderr, "-h\t\t Show this help\n");
+                fprintf(stderr, "-F<flags>\t Send engine scanning flags\n");
                 fprintf(stderr, "-f<format>\t Output format, could be: plain (default), spdx, spdx_xml or cyclonedx.\n");
-                fprintf(stderr, "-F<md5>\t UMZ a MD5 hash\n");
-                fprintf(stderr, "-w\t Scan a wfp file\n");
+                fprintf(stderr, "-a\t\t Get the attribution notices of a SBOM from a path\n");
+                fprintf(stderr, "-u\t\t UMZ a MD5 hash\n");
+                fprintf(stderr, "-w\t\t Scan a wfp file\n");
                 fprintf(stderr, "-o<file_name>\t Save the scan results in the specified file\n");
                 fprintf(stderr, "-l<file_name>\t Set logs filename\n");
                 fprintf(stderr, "-d\t\t Enable debug messages\n");
@@ -122,13 +139,27 @@ int main(int argc, char *argv[])
         strcpy(path,argv[optind]);
         char id[MAX_ID_LEN];
         sprintf(id,"scanoss CLI,%u", rand());
-        scanner_object_t * scanner = scanner_create(id, host,port,session,format,path,file, scanner_evt);
+        scanner_object_t * scanner = scanner_create(id, host,port,session,format,path,file,flags,scanner_evt);
         int err = EXIT_SUCCESS;
-        if (wfp_mode)
-            err = scanner_wfp_scan(scanner);
-        else
+
+        switch (proc)
+        {
+        case SCAN:
             err = scanner_recursive_scan(scanner);
-    
+            break;
+        case SCAN_WFP:
+            err = scanner_wfp_scan(scanner);
+            break;
+        case UMZ:
+            err = scanner_get_file_contents(scanner,path);
+            break;
+        case ATT_NOTICES:
+            err = scanner_get_attribution(scanner,path);
+            break;
+        default:
+            break;
+        }
+        
         if (print_output)
             scanner_print_output(scanner);
 
@@ -140,5 +171,4 @@ int main(int argc, char *argv[])
     }
     fprintf(stderr, "Missing parameter, run with -h for help\n");
     return EXIT_FAILURE;
-
 }

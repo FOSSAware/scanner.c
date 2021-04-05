@@ -62,7 +62,7 @@ const char EXCLUDED_EXTENSIONS[] = ".1, .2, .3, .4, .5, .6, .7, .8, .9, .ac, .ad
                                     ".xhtml, .xls, .xml, .xpm, .xsd, .xul, .yaml, .yml,";
 
 
-static int curl_request(int api_req, char* data,scanner_object_t *s);
+static int curl_request(int api_req, char* endpoint, char* data,scanner_object_t *s);
 
 /* Returns a hexadecimal representation of the first "len" bytes in "bin" */
 static char *bin_to_hex(uint8_t *bin, uint32_t len)
@@ -330,7 +330,7 @@ static bool scan_request_by_chunks(scanner_object_t *s)
         
             //get the result from the last chunk - It will be append to the output file
             fgetpos(s->output, &file_pos);
-            curl_request(API_REQ_POST,chunk_buffer,s);
+            curl_request(API_REQ_POST,"scan/direct",chunk_buffer,s);
 
             //correct json errors due to chunk proc.
             if (s->status.scanned_files > s->files_chunk_size)
@@ -427,25 +427,26 @@ static bool scanner_dir_proc(scanner_object_t *s, char *path)
 }
 
 
-static int curl_request(int api_req, char* data, scanner_object_t *s)
+static int curl_request(int api_req,char * endpoint, char* data, scanner_object_t *s)
 {
     char *m_host;
     char *user_version;
     char *user_session;
+    char *flags;
     //char *context;
 
     long m_port = strtol(s->API_port, NULL, 10);
     
     asprintf(&user_session, "X-session: %s", s->API_session);
     asprintf(&user_version, "User-Agent: SCANOSS_scanner.c/%s", VERSION);
-    //asprintf(&context,"context: %s", scanner->status.component_last);
+    asprintf(&flags,"%u",s->flags);
     
     if (api_req == API_REQ_POST)
-        asprintf(&m_host, "%s/scan/direct", s->API_host);
+        asprintf(&m_host, "%s/%s", s->API_host,endpoint);
 
     else
-        asprintf(&m_host,"%s/file_contents/%s",s->API_host,data);
-    
+        asprintf(&m_host,"%s/%s/%s",s->API_host,endpoint,data);
+        
     CURL *curl;
     CURLcode res;
     /* In windows, this will init the winsock stuff */
@@ -465,7 +466,8 @@ static int curl_request(int api_req, char* data, scanner_object_t *s)
         /* First set the URL that is about to receive our POST. */
         curl_easy_setopt(curl, CURLOPT_URL, m_host);
         curl_easy_setopt(curl, CURLOPT_PORT, m_port);
-       
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L); //curl ignore certificates
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L); //curl ignore certificates
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, s->output);
      
         if (log_level_is_enabled(LOG_TRACE))
@@ -477,7 +479,6 @@ static int curl_request(int api_req, char* data, scanner_object_t *s)
         chunk = curl_slist_append(chunk, "Connection: close");
         chunk = curl_slist_append(chunk, user_version);
         chunk = curl_slist_append(chunk, user_session);
-        //chunk = curl_slist_append(chunk, context);
         chunk = curl_slist_append(chunk, "Expect:");
         chunk = curl_slist_append(chunk, "Accept: */*");
 
@@ -492,6 +493,10 @@ static int curl_request(int api_req, char* data, scanner_object_t *s)
             part = curl_mime_addpart(mime);
             curl_mime_name(part, "format");
             curl_mime_data(part, s->format, CURL_ZERO_TERMINATED);
+
+            part = curl_mime_addpart(mime);
+            curl_mime_name(part, "flags");
+            curl_mime_data(part, flags, CURL_ZERO_TERMINATED);
 
             part = curl_mime_addpart(mime);
             curl_mime_name(part, "context");
@@ -525,7 +530,7 @@ static int curl_request(int api_req, char* data, scanner_object_t *s)
     }
 
     curl_global_cleanup();
-    
+    free(flags);
     free(m_host);
     free(user_session);
     free(user_version);
@@ -797,23 +802,22 @@ int scanner_wfp_scan(scanner_object_t * scanner)
 
 int scanner_get_file_contents(scanner_object_t *scanner, char * hash)
 { 
-    int err_code = curl_request(API_REQ_GET,hash,scanner);
+    int err_code = curl_request(API_REQ_GET,"file_contents",hash,scanner);
     fclose(scanner->output);
 
     return err_code;
 }
 
-
-bool scanner_umz(char * md5)
+bool scanner_get_attribution(scanner_object_t *scanner, char * path)
 {
-    scanner_object_t * scanner = scanner_create("0,SCANOSS-CLI",NULL,NULL,NULL,NULL,NULL,NULL, NULL);
+    long len;
+    char * data = read_file(path,&len);
 
-    if (scanner->output == NULL)
-        scanner->output = stdout;
+    int state = curl_request(API_REQ_POST,"sbom/attribution", data, scanner);
+    fclose(scanner->output);
 
-    int state = curl_request(API_REQ_GET,md5,scanner);
-    scanner_object_free(scanner);
-    return state;
+    free(data);
+    return state;   
 }
 
 
@@ -839,7 +843,7 @@ int scanner_print_output(scanner_object_t *scanner)
     free(scanner->output_path);
     return state;   
 }
-scanner_object_t * scanner_create(char * id, char * host, char * port, char * session, char * format, char * path, char * file, scanner_evt_handler callback)
+scanner_object_t * scanner_create(char * id, char * host, char * port, char * session, char * format, char * path, char * file, scanner_flags_t flags, scanner_evt_handler callback)
 {
     scanner_object_t *scanner = calloc(1, sizeof(scanner_object_t));
     scanner_object_t init = __SCANNER_OBJECT_INIT(path,file);
@@ -854,6 +858,9 @@ scanner_object_t * scanner_create(char * id, char * host, char * port, char * se
     scanner_set_port(scanner, port);
     scanner_set_session(scanner, session);
     scanner_set_format(scanner, format);
+    if (flags > 0)
+        scanner->flags = flags;
+    
     strcpy(scanner->status.message, "SCANNER_CREATED\0");
     return scanner;
 }
