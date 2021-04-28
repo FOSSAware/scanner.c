@@ -119,8 +119,48 @@ static bool scanner_is_file(char *path)
     return false;
 }
 
+static void scanner_report_open(scanner_object_t *s)
+{
+    if (!(s->flags & SCANNER_FLAG_DISABLE_OPEN_CLOSE_REPORT))
+        return;
+
+    if (strstr(s->format, SCANNER_FORMAT_PLAIN))
+    {
+        fprintf(s->output,"{\n");
+    }
+}
+
+static void scanner_report_close(scanner_object_t *s)
+{
+    if (!(s->flags & SCANNER_FLAG_DISABLE_OPEN_CLOSE_REPORT))
+        return;
+
+    if (strstr(s->format, SCANNER_FORMAT_PLAIN))
+    {
+        fseek(s->output,-1L,SEEK_END);
+        fprintf(s->output,"}\n");
+    }
+}
+
+static void scanner_report_separator(scanner_object_t *s)
+{
+    if (!(s->flags & SCANNER_FLAG_DISABLE_OPEN_CLOSE_REPORT))
+        return;
+
+    if (strstr(s->format, SCANNER_FORMAT_PLAIN))
+    {
+        fprintf(s->output,"\n,");
+    }
+}
+
+static void scanner_write_none_result(FILE * f, char * path)
+{
+    
+    fprintf(f, "\"%s\":[{\n\"id\":\"none\"\n}]\n,\n", path);
+}
+
 /* Scan a file */
-static bool scanner_file_proc(scanner_object_t *s,char *path)
+static bool scanner_file_proc(scanner_object_t *s, char *path)
 {
     bool state = true;
     char *wfp_buffer;
@@ -136,6 +176,7 @@ static bool scanner_file_proc(scanner_object_t *s,char *path)
     if (strstr(EXCLUDED_EXTENSIONS, f_extension))
     {
         log_trace("Excluded extension: %s", ext);
+        scanner_write_none_result(s->output, path); //add none id to ignored files
         return true; //avoid filtered extensions
     }
 
@@ -155,6 +196,7 @@ static bool scanner_file_proc(scanner_object_t *s,char *path)
     }
     else
     {
+        scanner_write_none_result(s->output, path); //add none id to ignored files
         log_trace("No wfp: %s", path);
     }
 
@@ -332,8 +374,9 @@ static bool scan_request_by_chunks(scanner_object_t *s)
             fgetpos(s->output, &file_pos);
             curl_request(API_REQ_POST,"scan/direct",chunk_buffer,s);
 
-            //correct json errors due to chunk proc.
-            if (s->status.scanned_files > s->files_chunk_size)
+            //correct json errors due to chunk prc, only if we have open/close report brackets.
+            if (!(s->flags & SCANNER_FLAG_DISABLE_OPEN_CLOSE_REPORT) 
+                && s->status.scanned_files > s->files_chunk_size)
             {
                // fsetpos(s->output,&file_pos);
                 int offset = post_response_pos-ftell(s->output)-128;
@@ -356,7 +399,9 @@ static bool scan_request_by_chunks(scanner_object_t *s)
             if (s->callback)
             {
                 s->callback(&s->status,SCANNER_EVT_CHUNK_PROC);
-            } 
+            }
+
+            scanner_report_separator(s);
         }
 
         last_file += strlen(file_key);
@@ -604,7 +649,11 @@ void scanner_set_output(scanner_object_t * e, char * f)
         e->output_path = f;
 
     e->output = fopen(e->output_path, "w+");
+    if (!e->output)
+        log_fatal("Failed to open the output file. Check the if the permmisions are right and if the directory exist");
+        
     log_debug("ID: %s -File open: %s", e->status.id, e->output_path);
+    scanner_report_open(e);
 }
 
 void scanner_wfp_capture(char *path, char **md5, char *wfp_buffer)
@@ -742,7 +791,10 @@ int scanner_recursive_scan(scanner_object_t * scanner)
     free(scanner->wfp_path);  
 
     if (scanner->output)
+    {
+        scanner_report_close(scanner);
         fclose(scanner->output);
+    }
 
     if (scanner->callback)
     {

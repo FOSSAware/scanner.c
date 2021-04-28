@@ -29,13 +29,17 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define VERSION "1.2.9"
+#define VERSION "1.3.0"
 #define MAX_HEADER_LEN 1024 * 1024 * 1024 * 10
 #define MAX_FILE_SIZE (1024 * 1024 * 4)
 #define MIN_FILE_SIZE 256
 
 #define SCAN_STATUS_MAX_SIZE 512
 
+#define SCANNER_FORMAT_PLAIN "plain"
+#define SCANNER_FORMAT_CYCLONEDX "cyclonedx"
+#define SCANNER_FORMAT_SPDX "spdx"
+#define SCANNER_FORMAT_SPDX_XML "spdx_xml"
 
 enum 
 {
@@ -54,7 +58,8 @@ typedef enum
     SCANNER_FLAG_DISABLE_QUALITY = 1<<6,
     SCANNER_FLAG_DISABLE_CRIPTOGRAPHY = 1<<7,  
     SCANNER_FLAG_DISABLE_BEST_MATCH_ONLY= 1<<8,
-    SCANNER_FLAG_DEFAULT = 0,
+    SCANNER_FLAG_DISABLE_OPEN_CLOSE_REPORT=1<<9,
+    SCANNER_FLAG_DEFAULT = SCANNER_FLAG_DISABLE_OPEN_CLOSE_REPORT,
 } scanner_flags_t;
 
 typedef enum
