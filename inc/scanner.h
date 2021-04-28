@@ -140,5 +140,6 @@ int scanner_recursive_scan(scanner_object_t *scanner);
 int scanner_wfp_scan(scanner_object_t * scanner);
 bool scanner_get_attribution(scanner_object_t *scanner, char * path);
 int scanner_get_file_contents(scanner_object_t *scanner, char * hash);
+int scanner_get_license_obligations(scanner_object_t *scanner, char * license_name);
 void scanner_object_free(scanner_object_t * scanner);
 #endif

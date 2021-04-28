@@ -808,6 +808,14 @@ int scanner_get_file_contents(scanner_object_t *scanner, char * hash)
     return err_code;
 }
 
+int scanner_get_license_obligations(scanner_object_t *scanner, char * license_name)
+{ 
+    int err_code = curl_request(API_REQ_GET,"license/obligations",license_name,scanner);
+    fclose(scanner->output);
+
+    return err_code;
+}
+
 bool scanner_get_attribution(scanner_object_t *scanner, char * path)
 {
     long len;

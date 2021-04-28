@@ -35,6 +35,7 @@ enum
     SCAN_WFP,
     UMZ,
     ATT_NOTICES,
+    LIC_OBLIGATIONS,
 };
 
 void scanner_evt(const scanner_status_t * p_scanner, scanner_evt_t evt)
@@ -78,7 +79,7 @@ int main(int argc, char *argv[])
     char path[512];
     int flags = 0;
 
-    while ((param = getopt (argc, argv, "F:H:p:f:o:l:auwhdt")) != -1)
+    while ((param = getopt (argc, argv, "F:H:p:f:o:L:aluwhdt")) != -1)
         switch (param)
         {
             case 'a':
@@ -101,7 +102,11 @@ int main(int argc, char *argv[])
                 print_output = false;
                 break;
             case 'l':
+                proc = LIC_OBLIGATIONS;
+                break;
+            case 'L':
                 scanner_set_log_file(optarg);
+                break;
             case 'd':
                 scanner_set_log_level(1);
                 break;
@@ -155,6 +160,9 @@ int main(int argc, char *argv[])
             break;
         case ATT_NOTICES:
             err = scanner_get_attribution(scanner,path);
+            break;
+         case LIC_OBLIGATIONS:
+            err = scanner_get_license_obligations(scanner,path);
             break;
         default:
             break;
