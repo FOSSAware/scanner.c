@@ -29,7 +29,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define VERSION "1.3.0"
+#define VERSION "1.3.1"
 #define MAX_HEADER_LEN 1024 * 1024 * 1024 * 10
 #define MAX_FILE_SIZE (1024 * 1024 * 4)
 #define MIN_FILE_SIZE 256
@@ -124,9 +124,9 @@ typedef struct scanner_object_t
 #define API_HOST_DEFAULT "osskb.org/api"
 #define API_PORT_DEFAULT "443"
 #define API_SESSION_DEFAULT "\0"
-#define DEFAULT_FILES_CHUNK 100
+#define CHUNK_SIZE_DEFAULT (64 * 1024)
 
-#define __SCANNER_OBJECT_INIT(path,file) {.API_host = API_HOST_DEFAULT, .API_port = API_PORT_DEFAULT, .API_session = API_SESSION_DEFAULT, .format = "plain", .files_chunk_size = DEFAULT_FILES_CHUNK,.scan_path = path, .output_path = file, .status.state = SCANNER_STATE_INIT, .flags = SCANNER_FLAG_DEFAULT , .callback = NULL,\
+#define __SCANNER_OBJECT_INIT(path,file) {.API_host = API_HOST_DEFAULT, .API_port = API_PORT_DEFAULT, .API_session = API_SESSION_DEFAULT, .format = "plain", .files_chunk_size = CHUNK_SIZE_DEFAULT,.scan_path = path, .output_path = file, .status.state = SCANNER_STATE_INIT, .flags = SCANNER_FLAG_DEFAULT , .callback = NULL,\
                                             .status.component_last="none"}
 
 void scanner_set_log_level(int level);

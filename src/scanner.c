@@ -45,21 +45,21 @@
 #define DEFAULT_WFP_SCAN_FILE_NAME "scan.wfp"
 #define DEFAULT_RESULT_NAME "scanner_output.txt"
 
-const char EXCLUDED_DIR[] = ".git, .svn, .eggs, __pycache__, node_modules,";
-const char EXCLUDED_EXTENSIONS[] = ".1, .2, .3, .4, .5, .6, .7, .8, .9, .ac, .adoc, .am,"
-	                                ".asciidoc, .bmp, .build, .cfg, .chm, .class, .cmake, .cnf,"
-	                                ".conf, .config, .contributors, .copying, .crt, .csproj, .css,"
-	                                ".csv, .cvsignore, .dat, .data, .doc, .ds_store, .dtd, .dts,"
-	                                ".dtsi, .dump, .eot, .eps, .geojson, .gdoc, .gif, .gitignore,"
-	                                ".glif, .gmo, .gradle, .guess, .hex, .htm, .html, .ico, .in,"
-                                    ".inc, .info, .ini, .ipynb, .jpeg, .jpg, .json, .jsonld,"
-                                    ".log, .m4, .map, .markdown, .md, .md5, .meta, .mk, .mxml,"
-                                    ".o, .otf, .out, .pbtxt, .pdf, .pem, .phtml, .plist, .png,"
-                                    ".po, .ppt, .prefs, .properties, .pyc, .qdoc, .result, .rgb,"
-                                    ".rst, .scss, .sha, .sha1, .sha2, .sha256, .sln, .spec, .sql,"
-                                    ".sub, .svg, .svn-base, .tab, .template, .test, .tex, .tiff,"
-                                    ".toml, .ttf, .txt, .utf-8, .vim, .wav, .whl, .woff, .xht,"
-                                    ".xhtml, .xls, .xml, .xpm, .xsd, .xul, .yaml, .yml,";
+const char EXCLUDED_DIR[] = " .git, .svn, .eggs, __pycache__, node_modules,";
+const char EXCLUDED_EXTENSIONS[] = " .1, .2, .3, .4, .5, .6, .7, .8, .9, .ac, .adoc, .am,"
+	                                " .asciidoc, .bmp, .build, .cfg, .chm, .class, .cmake, .cnf,"
+	                                " .conf, .config, .contributors, .copying, .crt, .csproj, .css,"
+	                                " .csv, .cvsignore, .dat, .data, .doc, .ds_store, .dtd, .dts,"
+	                                " .dtsi, .dump, .eot, .eps, .geojson, .gdoc, .gif, .gitignore,"
+	                                " .glif, .gmo, .gradle, .guess, .hex, .htm, .html, .ico, .in,"
+                                    " .inc, .info, .ini, .ipynb, .jpeg, .jpg, .json, .jsonld,"
+                                    " .log, .m4, .map, .markdown, .md, .md5, .meta, .mk, .mxml,"
+                                    " .o, .otf, .out, .pbtxt, .pdf, .pem, .phtml, .plist, .png,"
+                                    " .po, .ppt, .prefs, .properties, .pyc, .qdoc, .result, .rgb,"
+                                    " .rst, .scss, .sha, .sha1, .sha2, .sha256, .sln, .spec, .sql,"
+                                    " .sub, .svg, .svn-base, .tab, .template, .test, .tex, .tiff,"
+                                    " .toml, .ttf, .txt, .utf-8, .vim, .wav, .whl, .woff, .xht,"
+                                    " .xhtml, .xls, .xml, .xpm, .xsd, .xul, .yaml, .yml,";
 
 
 static int curl_request(int api_req, char* endpoint, char* data,scanner_object_t *s);
@@ -168,10 +168,10 @@ static bool scanner_file_proc(scanner_object_t *s, char *path)
     if (!ext)
         return state;
 
-    char f_extension[strlen(ext) + 2];
+    char f_extension[strlen(ext) + 3];
 
     /*File extension filter*/
-    sprintf(f_extension, "%s,", ext);
+    sprintf(f_extension, " %s,", ext);
 
     if (strstr(EXCLUDED_EXTENSIONS, f_extension))
     {
@@ -314,6 +314,7 @@ static bool scan_request_by_chunks(scanner_object_t *s)
     wfp_buffer[buffer_size] = 0;
     
     char * last_file = wfp_buffer;
+    char * prev_file = wfp_buffer;
     char * last_chunk = wfp_buffer;
     
     char post_response_buffer[START_FIND_COMP_FROM_END+1];
@@ -334,20 +335,18 @@ static bool scan_request_by_chunks(scanner_object_t *s)
     {      
         chunk_start_time = millis();
         last_file = strstr(last_file,file_key);
-        if (last_file)
-        {
-            files_count++;
-        }
 
-        if (files_count % s->files_chunk_size == 0|| (last_file == NULL))
+        if (last_file - last_chunk > s->files_chunk_size || (last_file == NULL))
         {
-            if (last_file == NULL)
-                last_file = &wfp_buffer[buffer_size];
+            if (last_file  == NULL)
+                prev_file = &wfp_buffer[buffer_size];
             //exact a new chunk from wfp file
-            char *chunk_buffer = calloc(last_file - last_chunk + 1, 1);
-            strncpy(chunk_buffer,last_chunk,last_file - last_chunk);
+            char *chunk_buffer = calloc(prev_file - last_chunk + 1, 1);
+            strncpy(chunk_buffer,last_chunk,prev_file - last_chunk);
             s->status.scanned_files = files_count; //update proc. files
-            last_chunk = last_file;
+            last_chunk = prev_file;
+            last_file = prev_file;
+            log_debug(chunk_buffer);
             //define the component context, find the last component in the output file.
             post_response_pos = ftell(s->output);
             
@@ -378,7 +377,6 @@ static bool scan_request_by_chunks(scanner_object_t *s)
             if (!(s->flags & SCANNER_FLAG_DISABLE_OPEN_CLOSE_REPORT) 
                 && s->status.scanned_files > s->files_chunk_size)
             {
-               // fsetpos(s->output,&file_pos);
                 int offset = post_response_pos-ftell(s->output)-128;
                 fseek(s->output,offset,SEEK_END);
                 memset(post_response_buffer,0,strlen(post_response_buffer));
@@ -403,7 +401,11 @@ static bool scan_request_by_chunks(scanner_object_t *s)
 
             scanner_report_separator(s);
         }
-
+        else
+        {
+            files_count++;
+        }
+        prev_file = last_file;
         last_file += strlen(file_key);
     }
     s->status.total_response_time = millis() - s->status.total_response_time;
@@ -437,19 +439,19 @@ static bool scanner_dir_proc(scanner_object_t *s, char *path)
 
     while ((entry = readdir(d)) != NULL)
     {
-        char temp[strlen(path) + strlen(entry->d_name) + 1];
+        char temp[strlen(path) + strlen(entry->d_name) + 2];
         
         sprintf(temp, "%s/%s", path, entry->d_name);
 
-        if (scanner_is_dir(temp))
+        if (entry->d_type == DT_DIR)
         {
 
             if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
                 continue;
 
             /*Directory filter */
-            char f_dir[strlen(entry->d_name) + 2];
-            sprintf(f_dir, "%s,", entry->d_name);
+            char f_dir[strlen(entry->d_name) + 3];
+            sprintf(f_dir, " %s,", entry->d_name);
             if (strstr(EXCLUDED_DIR, f_dir))
             {
                 log_trace("Excluded Directory: %s", entry->d_name);
