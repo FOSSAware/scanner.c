@@ -282,19 +282,25 @@ void json_correct(char * target)
     free(replacement);
 }
 
+static uint key_count(char * buffer, const char * key)
+{
+    char *found =  strstr(buffer, key);;
+    uint count = 0;
+    while(found)
+    {
+        found += strlen(key);
+        found = strstr(found,key);
+        count++;
+    }
+    return count;
+}
+
 static uint wfp_files_count(scanner_object_t *s)
 {
     const char file_key[] = "file=";
     long buffer_size = 0; //size of wfp file
     char *wfp_buffer = read_file(s->wfp_path, &buffer_size);
-    char *found =  strstr(wfp_buffer,file_key);;
-    uint count = 0;
-    while(found)
-    {
-        found += strlen(file_key);
-        found = strstr(found,file_key);
-        count++;
-    }
+    uint count =key_count(wfp_buffer,file_key);
     free(wfp_buffer);
     s->status.wfp_files = count;
     return count;
@@ -340,13 +346,21 @@ static bool scan_request_by_chunks(scanner_object_t *s)
         {
             if (last_file  == NULL)
                 prev_file = &wfp_buffer[buffer_size];
+            
             //exact a new chunk from wfp file
-            char *chunk_buffer = calloc(prev_file - last_chunk + 1, 1);
-            strncpy(chunk_buffer,last_chunk,prev_file - last_chunk);
+            uint size = prev_file - last_chunk;
+            if (size == 0)
+            {
+                size = s->files_chunk_size -1;
+                prev_file = last_file;
+            }
+                 
+            char *chunk_buffer = calloc(size + 1, 1);
+            strncpy(chunk_buffer,last_chunk,size);
+            
             s->status.scanned_files = files_count; //update proc. files
             last_chunk = prev_file;
             last_file = prev_file;
-            log_debug(chunk_buffer);
             //define the component context, find the last component in the output file.
             post_response_pos = ftell(s->output);
             
@@ -415,6 +429,7 @@ static bool scan_request_by_chunks(scanner_object_t *s)
         s->callback(&s->status,SCANNER_EVT_CHUNK_PROC_END);
     }
     
+    scanner_report_close(s);
     s->status.state = SCANNER_STATE_OK;
     return state;
 
@@ -794,7 +809,6 @@ int scanner_recursive_scan(scanner_object_t * scanner)
 
     if (scanner->output)
     {
-        scanner_report_close(scanner);
         fclose(scanner->output);
     }
 
