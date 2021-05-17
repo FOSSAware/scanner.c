@@ -159,6 +159,30 @@ static void scanner_write_none_result(scanner_object_t *s, char * path)
         fprintf(s->output, "\"%s\":[{\n\"id\":\"none\"\n}]\n,\n", path);
 }
 
+static uint key_count(char * buffer, const char * key)
+{
+    char *found =  strstr(buffer, key);;
+    uint count = 0;
+    while(found)
+    {
+        found += strlen(key);
+        found = strstr(found,key);
+        count++;
+    }
+    return count;
+}
+
+static uint wfp_files_count(scanner_object_t *s)
+{
+    const char file_key[] = "file=";
+    long buffer_size = 0; //size of wfp file
+    char *wfp_buffer = read_file(s->wfp_path, &buffer_size);
+    uint count =key_count(wfp_buffer,file_key);
+    free(wfp_buffer);
+    s->status.wfp_files = count;
+    return count;
+}
+
 /* Scan a file */
 static bool scanner_file_proc(scanner_object_t *s, char *path)
 {
@@ -190,6 +214,7 @@ static bool scanner_file_proc(scanner_object_t *s, char *path)
         log_debug("is a wfp file: %s", path);
         long len = 0;
         wfp_buffer = read_file(path, &len);
+        s->status.wfp_files += key_count(wfp_buffer,"file=") - 1; //correct the total files number
     }
     else
     {
@@ -292,30 +317,6 @@ void json_correct(char * target)
     strcpy(target,buffer);
     free(needle);
     free(replacement);
-}
-
-static uint key_count(char * buffer, const char * key)
-{
-    char *found =  strstr(buffer, key);;
-    uint count = 0;
-    while(found)
-    {
-        found += strlen(key);
-        found = strstr(found,key);
-        count++;
-    }
-    return count;
-}
-
-static uint wfp_files_count(scanner_object_t *s)
-{
-    const char file_key[] = "file=";
-    long buffer_size = 0; //size of wfp file
-    char *wfp_buffer = read_file(s->wfp_path, &buffer_size);
-    uint count =key_count(wfp_buffer,file_key);
-    free(wfp_buffer);
-    s->status.wfp_files = count;
-    return count;
 }
 
 static bool scan_request_by_chunks(scanner_object_t *s)
