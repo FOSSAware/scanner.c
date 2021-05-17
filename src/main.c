@@ -94,7 +94,7 @@ int main(int argc, char *argv[])
             case 'p':
                 strcpy(port,optarg);
                 break;
-            case 'O':
+            case 'f':
                 strcpy(format,optarg);
                 break;
             case 'o':

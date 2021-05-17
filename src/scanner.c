@@ -153,10 +153,10 @@ static void scanner_report_separator(scanner_object_t *s)
     }
 }
 
-static void scanner_write_none_result(FILE * f, char * path)
+static void scanner_write_none_result(scanner_object_t *s, char * path)
 {
-    
-    fprintf(f, "\"%s\":[{\n\"id\":\"none\"\n}]\n,\n", path);
+    if (strstr(s->format, SCANNER_FORMAT_PLAIN)) 
+        fprintf(s->output, "\"%s\":[{\n\"id\":\"none\"\n}]\n,\n", path);
 }
 
 /* Scan a file */
@@ -176,15 +176,27 @@ static bool scanner_file_proc(scanner_object_t *s, char *path)
     if (strstr(EXCLUDED_EXTENSIONS, f_extension))
     {
         log_trace("Excluded extension: %s", ext);
-        scanner_write_none_result(s->output, path); //add none id to ignored files
+        scanner_write_none_result(s, path); //add none id to ignored files
         return true; //avoid filtered extensions
     }
 
-    wfp_buffer = calloc(MAX_FILE_SIZE, 1);
-    *wfp_buffer = 0;
+   
     
     s->status.state = SCANNER_STATE_WFP_CALC; //update scanner state
-    scanner_wfp_capture(path,NULL, wfp_buffer);
+    
+    //If we have a wfp file, add the content to the main wfp file.
+    if (!strcmp(ext, ".wfp"))
+    {
+        log_debug("is a wfp file: %s", path);
+        long len = 0;
+        wfp_buffer = read_file(path, &len);
+    }
+    else
+    {
+         wfp_buffer = calloc(MAX_FILE_SIZE, 1);
+        *wfp_buffer = 0;
+        scanner_wfp_capture(path,NULL, wfp_buffer);
+    }
     
     if (*wfp_buffer)
     {
@@ -196,7 +208,7 @@ static bool scanner_file_proc(scanner_object_t *s, char *path)
     }
     else
     {
-        scanner_write_none_result(s->output, path); //add none id to ignored files
+        scanner_write_none_result(s, path); //add none id to ignored files
         log_trace("No wfp: %s", path);
     }
 
@@ -327,12 +339,7 @@ static bool scan_request_by_chunks(scanner_object_t *s)
     int post_response_pos = 0;
     long chunk_start_time = 0;
     fpos_t file_pos;
-    /*Patch for json join of no-plain formats*/
-    if(!strstr(s->format,"plain"))
-    {
-        s->files_chunk_size = MAX_FILES_CHUNK;
-        log_debug("Avoid chuck proc for %s format: %u",s->format,s->files_chunk_size);
-    }
+    
     s->status.state = SCANNER_STATE_ANALIZING;
     log_debug("ID: %s - Scanning, it could take some time, please be patient",s->status.id);
     //walk over wfp buffer search for file key
@@ -614,6 +621,14 @@ void scanner_set_format(scanner_object_t *s, char *form)
     }
     else
         log_debug("%s is not a valid output format, using plain\n", form);
+
+    /*Patch for json join of no-plain formats*/
+    if(!strstr(s->format,"plain"))
+    {
+        s->files_chunk_size = MAX_FILES_CHUNK;
+        log_debug("Avoid chuck proc for %s format: %u",s->format,s->files_chunk_size);
+        s->flags = 0;
+    }    
 }
 
 void scanner_set_host(scanner_object_t *s, char *host)
@@ -929,13 +944,16 @@ scanner_object_t * scanner_create(char * id, char * host, char * port, char * se
      //copy default config
     memcpy(scanner,&init,sizeof(scanner_object_t));
 
-    scanner_set_output(scanner, file);
     scanner_set_host(scanner, host);
     scanner_set_port(scanner, port);
     scanner_set_session(scanner, session);
-    scanner_set_format(scanner, format);
+
     if (flags > 0)
         scanner->flags = flags;
+
+    scanner_set_format(scanner, format);
+    scanner_set_output(scanner, file);
+
     
     strcpy(scanner->status.message, "SCANNER_CREATED\0");
     return scanner;
