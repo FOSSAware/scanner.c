@@ -104,15 +104,6 @@ int main(int argc, char *argv[])
             case 'l':
                 proc = LIC_OBLIGATIONS;
                 break;
-            case 'L':
-                scanner_set_log_file(optarg);
-                break;
-            case 'd':
-                scanner_set_log_level(1);
-                break;
-            case 't':
-                scanner_set_log_level(0);
-                break;
             case 'u':
                 proc = UMZ;
                 break;
@@ -132,8 +123,6 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "-w\t\t Scan a wfp file\n");
                 fprintf(stderr, "-o<file_name>\t Save the scan results in the specified file\n");
                 fprintf(stderr, "-l<file_name>\t Set logs filename\n");
-                fprintf(stderr, "-d\t\t Enable debug messages\n");
-                fprintf(stderr, "-t\t\t Enable trace messages, enable to see post request to the API\n");
                 fprintf(stderr, "\nFor more information, please visit https://scanoss.com\n");
                 exit(EXIT_FAILURE);
             break;
