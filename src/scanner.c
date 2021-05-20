@@ -214,7 +214,7 @@ static bool scanner_file_proc(scanner_object_t *s, char *path)
         wfp_buffer = read_file(path, &len);
         
         //ensure line end character
-        wfp_buffer[len-1] = '\n';
+        wfp_buffer[len] = '\n';
         s->status.wfp_files += key_count(wfp_buffer,"file=") - 1; //correct the total files number
     }
     else
