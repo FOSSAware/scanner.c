@@ -36,6 +36,7 @@
 #include "scanner.h"
 #include "blacklist_ext.h"
 #include "winnowing.h"
+#include "log.h"
 /*SCANNER PRIVATE PROPERTIES*/
 
 
@@ -198,7 +199,7 @@ static bool scanner_file_proc(scanner_object_t *s, char *path)
 
     if (strstr(EXCLUDED_EXTENSIONS, f_extension))
     {
-        fprintf(stderr,"Excluded extension: %s", ext);
+        log_trace("Excluded extension: %s", ext);
         scanner_write_none_result(s, path); //add none id to ignored files
         return true; //avoid filtered extensions
     }
@@ -210,6 +211,7 @@ static bool scanner_file_proc(scanner_object_t *s, char *path)
     //If we have a wfp file, add the content to the main wfp file.
     if (!strcmp(ext, ".wfp"))
     {
+        log_debug("is a wfp file: %s", path);
         long len = 0;
         wfp_buffer = read_file(path, &len);
         s->status.wfp_files += key_count(wfp_buffer,"file=") - 1; //correct the total files number
@@ -232,7 +234,7 @@ static bool scanner_file_proc(scanner_object_t *s, char *path)
     else
     {
         scanner_write_none_result(s, path); //add none id to ignored files
-        fprintf(stderr,"No wfp: %s", path);
+        log_trace("No wfp: %s", path);
     }
 
     free(wfp_buffer);
@@ -340,7 +342,7 @@ static bool scan_request_by_chunks(scanner_object_t *s)
     fpos_t file_pos;
     
     s->status.state = SCANNER_STATE_ANALIZING;
-    
+    log_debug("ID: %s - Scanning, it could take some time, please be patient",s->status.id);
     //walk over wfp buffer search for file key
     s->status.total_response_time = millis();
     while(last_file - wfp_buffer < buffer_size)
@@ -385,6 +387,8 @@ static bool scan_request_by_chunks(scanner_object_t *s)
             fread(post_response_buffer,1,START_FIND_COMP_FROM_END,s->output);
             get_last_component(post_response_buffer,s->status.component_last);
             
+            log_debug("Last found component: %s", s->status.component_last);
+            
             fseek(s->output,0L,SEEK_END);
         
             //get the result from the last chunk - It will be append to the output file
@@ -410,7 +414,7 @@ static bool scan_request_by_chunks(scanner_object_t *s)
             free(chunk_buffer);
             state = false;
             s->status.last_chunk_response_time = millis() - chunk_start_time; 
-            
+            log_debug("ID: %s - Chunk proc. end, %u processed files in %ld ms", s->status.id, s->status.scanned_files,millis() - s->status.total_response_time);
             sprintf(s->status.message, "CHUNK_PROC_%lu_ms", s->status.last_chunk_response_time);
             if (s->callback)
             {
@@ -473,7 +477,7 @@ static bool scanner_dir_proc(scanner_object_t *s, char *path)
             sprintf(f_dir, " %s,", entry->d_name);
             if (strstr(EXCLUDED_DIR, f_dir))
             {
-                fprintf(stderr,"Excluded Directory: %s", entry->d_name);
+                log_trace("Excluded Directory: %s", entry->d_name);
                 continue;
             }
             scanner_dir_proc(s, temp); //If its a valid directory, then process it
@@ -482,7 +486,7 @@ static bool scanner_dir_proc(scanner_object_t *s, char *path)
         {
             if (!scanner_file_proc(s ,temp))
             {
-                fprintf(stderr,"Scan: %s", temp);
+                log_trace("Scan: %s", temp);
             }
             state = false;
         }
@@ -520,8 +524,9 @@ static int curl_request(int api_req,char * endpoint, char* data, scanner_object_
     /* Check for errors */
     if (res != CURLE_OK)
     {
-        fprintf(stderr,"curl_global_init() failed: %s\n", curl_easy_strerror(res));
-				exit(EXIT_FAILURE);
+        log_fatal("curl_global_init() failed: %s\n",
+                curl_easy_strerror(res));
+        return 1;
     }
 
     /* get a curl handle */
@@ -535,6 +540,9 @@ static int curl_request(int api_req,char * endpoint, char* data, scanner_object_
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L); //curl ignore certificates
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, s->output);
      
+        if (log_level_is_enabled(LOG_TRACE))
+            curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+
         curl_easy_setopt(curl, CURLOPT_DEFAULT_PROTOCOL, "https");
 
         struct curl_slist *chunk = NULL;
@@ -579,7 +587,7 @@ static int curl_request(int api_req,char * endpoint, char* data, scanner_object_
         /* Check for errors */
         if (res != CURLE_OK)
         {
-            fprintf(stderr,"curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+            log_error("curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
             if (s->callback)
             {
                 s->callback(&s->status,SCANNER_EVT_ERROR_CURL);
@@ -613,12 +621,13 @@ void scanner_set_format(scanner_object_t *s, char *form)
         strncpy(s->format, form, sizeof(s->format));
     }
     else
-        fprintf(stderr,"%s is not a valid output format, using plain\n", form);
+        log_debug("%s is not a valid output format, using plain\n", form);
 
     /*Patch for json join of no-plain formats*/
     if(!strstr(s->format,"plain"))
     {
         s->files_chunk_size = MAX_FILES_CHUNK;
+        log_debug("Avoid chuck proc for %s format: %u",s->format,s->files_chunk_size);
         s->flags = 0;
     }    
 }
@@ -630,7 +639,7 @@ void scanner_set_host(scanner_object_t *s, char *host)
 
     memset(s->API_host, '\0', sizeof(s->API_host));
     strncpy(s->API_host, host, sizeof(s->API_host));
-    fprintf(stderr,"Host set: %s", s->API_host);
+    log_debug("Host set: %s", s->API_host);
 }
 
 void scanner_set_port(scanner_object_t *s, char *port)
@@ -640,7 +649,7 @@ void scanner_set_port(scanner_object_t *s, char *port)
 
     memset(s->API_port, '\0', sizeof(s->API_port));
     strncpy(s->API_port, port, sizeof(s->API_port));
-    fprintf(stderr,"Port set: %s", s->API_port);
+    log_debug("Port set: %s", s->API_port);
 }
 
 void scanner_set_session(scanner_object_t *s, char *session)
@@ -650,7 +659,17 @@ void scanner_set_session(scanner_object_t *s, char *session)
 
     memset(s->API_session, '\0', sizeof(s->API_session));
     strncpy(s->API_session, session, sizeof(s->API_session));
-    fprintf(stderr,"Session set: %s", s->API_session);
+    log_debug("Session set: %s", s->API_session);
+}
+
+void scanner_set_log_level(int level)
+{
+    log_set_level(level);
+}
+
+void scanner_set_log_file(char *log)
+{
+    log_set_file(log);
 }
 
 void scanner_set_output(scanner_object_t * e, char * f)
@@ -664,11 +683,9 @@ void scanner_set_output(scanner_object_t * e, char * f)
 
     e->output = fopen(e->output_path, "w+");
     if (!e->output)
-		{
-        fprintf(stderr,"Failed to open the output file. Check the if the permmisions are right and if the directory exist");
-				exit(EXIT_FAILURE);
-		}
+        log_fatal("Failed to open the output file. Check the if the permmisions are right and if the directory exist");
         
+    log_debug("ID: %s -File open: %s", e->status.id, e->output_path);
     scanner_report_open(e);
 }
 
@@ -749,8 +766,7 @@ int scanner_recursive_scan(scanner_object_t * scanner)
 {  
     if (!scanner)
     {
-        fprintf(stderr,"Scanner object need to proceed");
-				exit(EXIT_FAILURE);
+        log_fatal("Scanner object need to proceed");
     }
     scanner->status.state = SCANNER_STATE_INIT;
     scanner->status.wfp_files = 0;
@@ -761,6 +777,7 @@ int scanner_recursive_scan(scanner_object_t * scanner)
     asprintf(&scanner->wfp_path,"%s.wfp",scanner->output_path);
 
     strcpy(scanner->status.message, "WFP_CALC_START\0");
+    log_debug("ID: %s - Scan start - WFP Calculation", scanner->status.id);
     
     if (scanner->callback)
     {
@@ -789,13 +806,14 @@ int scanner_recursive_scan(scanner_object_t * scanner)
     else
     {
         scanner->status.state = SCANNER_STATE_ERROR;
-        fprintf(stderr,"\"%s\" is not a file\n", scanner->scan_path);
+        log_error("\"%s\" is not a file\n", scanner->scan_path);
         if (scanner->callback)
         {
             scanner->callback(&scanner->status,SCANNER_EVT_ERROR);
         }
     }
     scanner->status.wfp_total_time = millis() - scanner->status.wfp_total_time;
+    log_debug("ID: %s - WFP calculation end, %u processed files in %ld ms", scanner->status.id, scanner->status.wfp_files, scanner->status.wfp_total_time);
     if (scanner->callback)
     {
         scanner->callback(&scanner->status,SCANNER_EVT_WFP_CALC_END);
@@ -823,8 +841,7 @@ int scanner_wfp_scan(scanner_object_t * scanner)
 {
     if (!scanner)
     {
-        fprintf(stderr,"Scanner object need to proceed");
-				exit(EXIT_FAILURE);
+        log_fatal("Scanner object need to proceed");
     }
     scanner->status.state = SCANNER_STATE_INIT;
     scanner->status.wfp_files = 0;
@@ -835,6 +852,7 @@ int scanner_wfp_scan(scanner_object_t * scanner)
 
     if(!scanner_is_file(scanner->scan_path))
     {
+        log_debug("wfp_scan only works with wfp files");
         return SCANNER_STATE_ERROR;
     }
 
@@ -844,6 +862,7 @@ int scanner_wfp_scan(scanner_object_t * scanner)
         return SCANNER_STATE_ERROR;
 
     strcpy(scanner->status.message, "WFP_PROC_START\0");
+    log_debug("ID: %s - Scan start - Scanning WFP file by chunks", scanner->status.id);
     if (scanner->callback)
     {
         scanner->callback(&scanner->status,SCANNER_EVT_CHUNK_PROC);
