@@ -59,7 +59,7 @@ void __logger(int level, const char *file, int line, const char *func, const cha
   va_list args;
 
   // II. Format log
-  fprintf(LOG_FILE, "%s %lu %-5s %s:%s:%d: ", buf, pthread_self(), level_names[level], file, func, line);
+  fprintf(LOG_FILE, "%s %lu %-5s %s:%s:%d: ", buf, (unsigned long) pthread_self(), level_names[level], file, func, line);
   va_start(args, format);
   vfprintf(LOG_FILE, format, args);
   va_end(args);

@@ -87,7 +87,7 @@ static char *read_file(char *path, long *length)
     FILE *fp = fopen(path, "rb");
     fseek(fp, 0, SEEK_END);
     *length = ftell(fp);
-    char *src = calloc(*length + 1, 1);
+    char *src = calloc(*length + 2, 1);
     fseek(fp, 0, SEEK_SET);
     fread(src, 1, *length, fp);
     fclose(fp);
@@ -202,9 +202,7 @@ static bool scanner_file_proc(scanner_object_t *s, char *path)
         log_trace("Excluded extension: %s", ext);
         scanner_write_none_result(s, path); //add none id to ignored files
         return true; //avoid filtered extensions
-    }
-
-   
+    } 
     
     s->status.state = SCANNER_STATE_WFP_CALC; //update scanner state
     
@@ -214,6 +212,9 @@ static bool scanner_file_proc(scanner_object_t *s, char *path)
         log_debug("is a wfp file: %s", path);
         long len = 0;
         wfp_buffer = read_file(path, &len);
+        
+        //ensure line end character
+        wfp_buffer[len-1] = '\n';
         s->status.wfp_files += key_count(wfp_buffer,"file=") - 1; //correct the total files number
     }
     else
