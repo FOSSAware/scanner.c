@@ -29,17 +29,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define VERSION "1.3.2"
+#define VERSION "1.3.3"
 #define MAX_HEADER_LEN 1024 * 1024 * 1024 * 10
 #define MAX_FILE_SIZE (1024 * 1024 * 4)
 #define MIN_FILE_SIZE 256
 
 #define SCAN_STATUS_MAX_SIZE 512
-
-#define SCANNER_FORMAT_PLAIN "plain"
-#define SCANNER_FORMAT_CYCLONEDX "cyclonedx"
-#define SCANNER_FORMAT_SPDX "spdx"
-#define SCANNER_FORMAT_SPDX_XML "spdx_xml"
 
 enum 
 {

@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "Option\t\t Meaning\n");
                 fprintf(stderr, "-h\t\t Show this help\n");
                 fprintf(stderr, "-F<flags>\t Send engine scanning flags\n");
-                fprintf(stderr, "-f<format>\t Output format, could be: plain (default), spdx, spdx_xml or cyclonedx.\n");
+                fprintf(stderr, "-f<format>\t Output format, could be: plain (default), spdx or cyclonedx.\n");
                 fprintf(stderr, "-a\t\t Get the attribution notices of a SBOM from a path\n");
                 fprintf(stderr, "-u\t\t UMZ a MD5 hash\n");
                 fprintf(stderr, "-w\t\t Scan a wfp file\n");

@@ -22,7 +22,6 @@
 
 #define _GNU_SOURCE
 #include <ctype.h>
-#include <openssl/bio.h>
 #include <openssl/md5.h>
 #include <openssl/ssl.h>
 #include <dirent.h>
@@ -37,6 +36,7 @@
 #include "blacklist_ext.h"
 #include "winnowing.h"
 #include "log.h"
+#include "format_utils.h"
 /*SCANNER PRIVATE PROPERTIES*/
 
 
@@ -123,23 +123,15 @@ static void scanner_report_open(scanner_object_t *s)
 {
     if (!(s->flags & SCANNER_FLAG_DISABLE_OPEN_CLOSE_REPORT))
         return;
-
-    if (strstr(s->format, SCANNER_FORMAT_PLAIN))
-    {
-        fprintf(s->output,"{\n");
-    }
+    fprintf(s->output,"{\n");
 }
 
 static void scanner_report_close(scanner_object_t *s)
 {
     if (!(s->flags & SCANNER_FLAG_DISABLE_OPEN_CLOSE_REPORT))
         return;
-
-    if (strstr(s->format, SCANNER_FORMAT_PLAIN))
-    {
-        fseek(s->output,-1L,SEEK_END);
-        fprintf(s->output,"}\n");
-    }
+    fseek(s->output,-1L,SEEK_END);
+    fprintf(s->output,"}\n");
 }
 
 static void scanner_report_separator(scanner_object_t *s)
@@ -147,16 +139,12 @@ static void scanner_report_separator(scanner_object_t *s)
     if (!(s->flags & SCANNER_FLAG_DISABLE_OPEN_CLOSE_REPORT))
         return;
 
-    if (strstr(s->format, SCANNER_FORMAT_PLAIN))
-    {
-        fprintf(s->output,"\n,");
-    }
+    fprintf(s->output,"\n,");
 }
 
 static void scanner_write_none_result(scanner_object_t *s, char * path)
 {
-    if (strstr(s->format, SCANNER_FORMAT_PLAIN)) 
-        fprintf(s->output, "\"%s\":[{\n\"id\":\"none\"\n}]\n,\n", path);
+    fprintf(s->output, "\"%s\":[{\n\"id\":\"none\"\n}]\n,\n", path);
 }
 
 static uint key_count(char * buffer, const char * key)
@@ -437,8 +425,9 @@ static bool scan_request_by_chunks(scanner_object_t *s)
     {
         s->callback(&s->status,SCANNER_EVT_CHUNK_PROC_END);
     }
-    
+    free(wfp_buffer);
     scanner_report_close(s);
+
     s->status.state = SCANNER_STATE_OK;
     return state;
 
@@ -504,7 +493,7 @@ static int curl_request(int api_req,char * endpoint, char* data, scanner_object_
     char *user_version;
     char *user_session;
     char *flags;
-    //char *context;
+    curl_mime *mime;
 
     long m_port = strtol(s->API_port, NULL, 10);
     
@@ -557,13 +546,14 @@ static int curl_request(int api_req,char * endpoint, char* data, scanner_object_
 
         if (api_req == API_REQ_POST)
         {
-            curl_mime *mime;
             curl_mimepart *part;
             mime = curl_mime_init(curl);
             
             part = curl_mime_addpart(mime);
             curl_mime_name(part, "format");
-            curl_mime_data(part, s->format, CURL_ZERO_TERMINATED);
+            //curl_mime_data(part, s->format, CURL_ZERO_TERMINATED);
+            //we are forcing to plain format because spdx and cyclonedx are processing local.
+            curl_mime_data(part, "plain", CURL_ZERO_TERMINATED);
 
             part = curl_mime_addpart(mime);
             curl_mime_name(part, "flags");
@@ -605,11 +595,31 @@ static int curl_request(int api_req,char * endpoint, char* data, scanner_object_
     free(m_host);
     free(user_session);
     free(user_version);
-   // free(context);
+    if (API_REQ_POST)
+        curl_mime_free(mime);
 
     return 0;
 
 }
+bool print_format(scanner_object_t * s)
+{
+    if (!strcmp(s->format, SCANNER_FORMAT_PLAIN))
+        return false;
+
+    fprintf(stderr, "\nPrinting the selected format: %s", s->format);
+    if(scan_parse_v2(s->output_path))
+    {
+        log_error("There was a error parsing the json file, please check the output: %s", s->output_path);
+        return true;
+    }
+    
+    //rewrite output path with the selected format
+    s->output = fopen(s->output_path, "w+");
+    print_matches(s->output, s->format);
+    fclose(s->output);
+    return false;
+}
+
 /********* PUBLIC FUNTIONS DEFINITION ************/
 
 void scanner_set_format(scanner_object_t *s, char *form)
@@ -623,14 +633,7 @@ void scanner_set_format(scanner_object_t *s, char *form)
     }
     else
         log_debug("%s is not a valid output format, using plain\n", form);
-
-    /*Patch for json join of no-plain formats*/
-    if(!strstr(s->format,"plain"))
-    {
-        s->files_chunk_size = MAX_FILES_CHUNK;
-        log_debug("Avoid chuck proc for %s format: %u",s->format,s->files_chunk_size);
-        s->flags = 0;
-    }    
+  
 }
 
 void scanner_set_host(scanner_object_t *s, char *host)
@@ -828,6 +831,8 @@ int scanner_recursive_scan(scanner_object_t * scanner)
     {
         fclose(scanner->output);
     }
+    //print the selected format or do nothing if it is plain.
+    print_format(scanner);
 
     if (scanner->callback)
     {
@@ -917,7 +922,7 @@ bool scanner_get_attribution(scanner_object_t *scanner, char * path)
 int scanner_print_output(scanner_object_t *scanner)
 {
     bool state = true;
-
+    
     if (!scanner->output_path)
         return 1;
 

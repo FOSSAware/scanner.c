@@ -1,9 +1,12 @@
 CC=gcc
+WIN64CC=x86_64-w64-mingw32-gcc
 # Enable all compiler warnings. 
 CCFLAGS+= -fPIC -g -Wall -Werror -std=gnu99 -I./inc -I./external/inc
 
 # Linker flags
 LDFLAGS+=-lpthread -lcrypto -lssl -lcurl -lm
+LDFLAGS_WIN64+=-L/home/osboxes/scanoss/curl-7.76.1/lib -L/usr/local/lib/ -lpthread -lcrypto -lssl -lcurl -lm
+
 LIBFLAGS=-O -g -Wall -std=gnu99 -fPIC -c
 
 VERSION=`./scanner -h 2>&1  | head -n 1 | cut -d"-" -f2`
@@ -15,6 +18,7 @@ SOURCES_LIB=$(filter-out src/main.c, $(SOURCES_SCANNER))
 OBJECTS_LIB=$(SOURCES_LIB:.c=.o)
 
 TARGET_SCANNER=scanner
+TARGET_SCANNER_WIN64=scanner_win64
 TARGET_LIB=lib
 TARGET_NOINTEL=no_intel
 
@@ -27,7 +31,9 @@ $(TARGET_NOINTEL): CCFLAGS += -DCRC32_SOFTWARE_MODE
 all: clean scanner deb
 
 $(TARGET_SCANNER): $(OBJECTS_SCANNER)
-	$(CC) -g -o $(BIN_NAME) $^ $(LDFLAGS) 
+	$(CC) -g -o $(BIN_NAME) $^ $(LDFLAGS)
+$(TARGET_SCANNER_WIN64): $(OBJECTS_SCANNER)
+	$(WIN64CC) -g -o $(BIN_NAME) $^ $(LDFLAGS_WIN64) 
 
 $(TARGET_LIB): $(OBJECTS_LIB)
 	$(CC) -g -o $(LIB_NAME) $^ $(LDFLAGS) -shared -Wl,-soname,libscanner.so
