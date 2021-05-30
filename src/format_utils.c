@@ -161,27 +161,6 @@ void process_scan_result(json_value *result)
   }
 }
 
-// typedef struct match_data
-// {
-// 	matchtype type;
-// 	char vendor[MAX_FIELD_LN];
-// 	char component[MAX_FIELD_LN];
-// 	char version[MAX_FIELD_LN];
-// 	char release_date[MAX_FIELD_LN];
-// 	char latest_version[MAX_FIELD_LN];
-// 	char purl[MAX_FIELD_LN];
-// 	char license[MAX_FIELD_LN];
-// 	char url[MAX_FILE_PATH];
-// 	char file[MAX_FILE_PATH];
-// 	int  path_ln;
-// 	uint8_t file_md5[MD5_LEN];
-// 	uint8_t url_md5[MD5_LEN];
-// 	uint8_t pair_md5[MD5_LEN];
-// 	uint32_t crclist[CRC_LIST_LEN];
-// 	int vulnerabilities;
-// 	bool selected;
-// 	bool snippet_to_component;
-// } match_data;
 void match_list_free(match_data_list *list)
 {
 
