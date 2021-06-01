@@ -493,7 +493,7 @@ static int curl_request(int api_req,char * endpoint, char* data, scanner_object_
     char *user_version;
     char *user_session;
     char *flags;
-    curl_mime *mime;
+    curl_mime *mime = NULL;
 
     long m_port = strtol(s->API_port, NULL, 10);
     
