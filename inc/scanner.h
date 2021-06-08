@@ -29,7 +29,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define VERSION "1.3.3"
+#define VERSION "1.3.4"
 #define MAX_HEADER_LEN 1024 * 1024 * 1024 * 10
 #define MAX_FILE_SIZE (1024 * 1024 * 4)
 #define MIN_FILE_SIZE 256
@@ -53,8 +53,7 @@ typedef enum
     SCANNER_FLAG_DISABLE_QUALITY = 1<<6,
     SCANNER_FLAG_DISABLE_CRIPTOGRAPHY = 1<<7,  
     SCANNER_FLAG_DISABLE_BEST_MATCH_ONLY= 1<<8,
-    SCANNER_FLAG_DISABLE_OPEN_CLOSE_REPORT=1<<9,
-    SCANNER_FLAG_DEFAULT = SCANNER_FLAG_DISABLE_OPEN_CLOSE_REPORT,
+    SCANNER_FLAG_DEFAULT = 0,
 } scanner_flags_t;
 
 typedef enum
@@ -109,7 +108,9 @@ typedef struct scanner_object_t
     char * scan_path;
     char *output_path;
     char *wfp_path;
+    char * curl_temp_path;
     FILE *output;
+    FILE * curl_temp;
     unsigned int files_chunk_size;
     scanner_flags_t flags;
     scanner_status_t status;

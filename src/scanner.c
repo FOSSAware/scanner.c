@@ -33,6 +33,7 @@
 #include <sys/time.h>
 #include <math.h>
 #include "scanner.h"
+//ggggggggggggggggggggggggggg
 #include "blacklist_ext.h"
 #include "winnowing.h"
 #include "log.h"
@@ -119,28 +120,6 @@ static bool scanner_is_file(char *path)
     return false;
 }
 
-static void scanner_report_open(scanner_object_t *s)
-{
-    if (!(s->flags & SCANNER_FLAG_DISABLE_OPEN_CLOSE_REPORT))
-        return;
-    fprintf(s->output,"{\n");
-}
-
-static void scanner_report_close(scanner_object_t *s)
-{
-    if (!(s->flags & SCANNER_FLAG_DISABLE_OPEN_CLOSE_REPORT))
-        return;
-    fseek(s->output,-1L,SEEK_END);
-    fprintf(s->output,"}\n");
-}
-
-static void scanner_report_separator(scanner_object_t *s)
-{
-    if (!(s->flags & SCANNER_FLAG_DISABLE_OPEN_CLOSE_REPORT))
-        return;
-
-    fprintf(s->output,"\n,");
-}
 
 static void scanner_write_none_result(scanner_object_t *s, char * path)
 {
@@ -330,6 +309,8 @@ static bool scan_request_by_chunks(scanner_object_t *s)
     long chunk_start_time = 0;
     fpos_t file_pos;
     
+    asprintf(&s->curl_temp_path,"%s.tmp",s->output_path);
+
     s->status.state = SCANNER_STATE_ANALIZING;
     log_debug("ID: %s - Scanning, it could take some time, please be patient",s->status.id);
     //walk over wfp buffer search for file key
@@ -383,23 +364,15 @@ static bool scan_request_by_chunks(scanner_object_t *s)
             //get the result from the last chunk - It will be append to the output file
             fgetpos(s->output, &file_pos);
             curl_request(API_REQ_POST,"scan/direct",chunk_buffer,s);
-
-            //correct json errors due to chunk prc, only if we have open/close report brackets.
-            if (!(s->flags & SCANNER_FLAG_DISABLE_OPEN_CLOSE_REPORT) 
-                && s->status.scanned_files > s->files_chunk_size)
-            {
-                int offset = post_response_pos-ftell(s->output)-128;
-                fseek(s->output,offset,SEEK_END);
-                memset(post_response_buffer,0,strlen(post_response_buffer));
-                fread(post_response_buffer,1,156,s->output);
-                
-                json_correct(post_response_buffer);
-                
-                fseek(s->output,offset,SEEK_END);
-                fwrite(post_response_buffer,1,strlen(post_response_buffer),s->output);
-                fseek(s->output,0L,SEEK_END);
-            }
-
+            
+            /*read curl response and correct the json */
+            long chunk_resp_size;
+            char * chunk_resp = read_file(s->curl_temp_path, &chunk_resp_size);
+            char * last_bracket = strrchr(chunk_resp,'}');
+            *last_bracket = ','; //replace } by ,
+            fwrite(chunk_resp+1, 1, chunk_resp_size - 1, s->output); // avoid first {
+            free(chunk_resp);
+            
             free(chunk_buffer);
             state = false;
             s->status.last_chunk_response_time = millis() - chunk_start_time; 
@@ -410,7 +383,6 @@ static bool scan_request_by_chunks(scanner_object_t *s)
                 s->callback(&s->status,SCANNER_EVT_CHUNK_PROC);
             }
 
-            scanner_report_separator(s);
         }
         else
         {
@@ -420,13 +392,17 @@ static bool scan_request_by_chunks(scanner_object_t *s)
         last_file += strlen(file_key);
     }
     s->status.total_response_time = millis() - s->status.total_response_time;
-
+    
+    fseek(s->output,-4L,SEEK_END);
+    fprintf(s->output,"\n}");
+    
     if (s->callback)
     {
         s->callback(&s->status,SCANNER_EVT_CHUNK_PROC_END);
     }
     free(wfp_buffer);
-    scanner_report_close(s);
+    remove(s->curl_temp_path); //delete tmp file
+    free(s->curl_temp_path);  
 
     s->status.state = SCANNER_STATE_OK;
     return state;
@@ -500,6 +476,8 @@ static int curl_request(int api_req,char * endpoint, char* data, scanner_object_
     asprintf(&user_session, "X-session: %s", s->API_session);
     asprintf(&user_version, "User-Agent: SCANOSS_scanner.c/%s", VERSION);
     asprintf(&flags,"%u",s->flags);
+
+    s->curl_temp = fopen(s->curl_temp_path, "w+");
     
     if (api_req == API_REQ_POST)
         asprintf(&m_host, "%s/%s", s->API_host,endpoint);
@@ -528,7 +506,7 @@ static int curl_request(int api_req,char * endpoint, char* data, scanner_object_
         curl_easy_setopt(curl, CURLOPT_PORT, m_port);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L); //curl ignore certificates
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L); //curl ignore certificates
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, s->output);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, s->curl_temp);
      
         if (log_level_is_enabled(LOG_TRACE))
             curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
@@ -584,7 +562,8 @@ static int curl_request(int api_req,char * endpoint, char* data, scanner_object_
                 s->callback(&s->status,SCANNER_EVT_ERROR_CURL);
             }
         }
-
+        
+        fclose(s->curl_temp);
         /* always cleanup */
         curl_easy_cleanup(curl);
         curl_slist_free_all(chunk);
@@ -688,9 +667,10 @@ void scanner_set_output(scanner_object_t * e, char * f)
     e->output = fopen(e->output_path, "w+");
     if (!e->output)
         log_fatal("Failed to open the output file. Check the if the permmisions are right and if the directory exist");
-        
+    
+    //open json file
+    fprintf(e->output,"{\n");    
     log_debug("ID: %s -File open: %s", e->status.id, e->output_path);
-    scanner_report_open(e);
 }
 
 void scanner_wfp_capture(char *path, char **md5, char *wfp_buffer)
@@ -779,7 +759,6 @@ int scanner_recursive_scan(scanner_object_t * scanner)
     scanner->status.last_chunk_response_time = 0;
     scanner->status.total_response_time = 0;
     asprintf(&scanner->wfp_path,"%s.wfp",scanner->output_path);
-
     strcpy(scanner->status.message, "WFP_CALC_START\0");
     log_debug("ID: %s - Scan start - WFP Calculation", scanner->status.id);
     
@@ -892,16 +871,16 @@ int scanner_wfp_scan(scanner_object_t * scanner)
 
 int scanner_get_file_contents(scanner_object_t *scanner, char * hash)
 { 
+    scanner->curl_temp_path = scanner->output_path;
     int err_code = curl_request(API_REQ_GET,"file_contents",hash,scanner);
-    fclose(scanner->output);
 
     return err_code;
 }
 
 int scanner_get_license_obligations(scanner_object_t *scanner, char * license_name)
 { 
+    scanner->curl_temp_path = scanner->output_path;
     int err_code = curl_request(API_REQ_GET,"license/obligations",license_name,scanner);
-    fclose(scanner->output);
 
     return err_code;
 }
@@ -910,9 +889,9 @@ bool scanner_get_attribution(scanner_object_t *scanner, char * path)
 {
     long len;
     char * data = read_file(path,&len);
-
+    
+    scanner->curl_temp_path = scanner->output_path;
     int state = curl_request(API_REQ_POST,"sbom/attribution", data, scanner);
-    fclose(scanner->output);
 
     free(data);
     return state;   
