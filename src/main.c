@@ -28,13 +28,14 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include "scanner.h"
+#include "format_utils.h"
 
 enum
 {
     SCAN = 0,
     SCAN_WFP,
     UMZ,
-    ATT_NOTICES,
+    CONVERT,
     LIC_OBLIGATIONS,
 };
 
@@ -79,11 +80,11 @@ int main(int argc, char *argv[])
     char path[512];
     int flags = 0;
 
-    while ((param = getopt (argc, argv, "F:H:p:f:o:L:aluwhdt")) != -1)
+    while ((param = getopt (argc, argv, "F:H:p:f:o:L:cluwhdt")) != -1)
         switch (param)
         {
-            case 'a':
-                proc = ATT_NOTICES;
+            case 'c':
+                proc = CONVERT;
                 break;
             case 'F':
                 flags = atol(optarg);
@@ -127,7 +128,6 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "-h\t\t Show this help\n");
                 fprintf(stderr, "-F<flags>\t Send engine scanning flags\n");
                 fprintf(stderr, "-f<format>\t Output format, could be: plain (default), spdx or cyclonedx.\n");
-                fprintf(stderr, "-a\t\t Get the attribution notices of a SBOM from a path\n");
                 fprintf(stderr, "-u\t\t UMZ a MD5 hash\n");
                 fprintf(stderr, "-w\t\t Scan a wfp file\n");
                 fprintf(stderr, "-o<file_name>\t Save the scan results in the specified file\n");
@@ -158,8 +158,14 @@ int main(int argc, char *argv[])
         case UMZ:
             err = scanner_get_file_contents(scanner,path);
             break;
-        case ATT_NOTICES:
-            err = scanner_get_attribution(scanner,path);
+        case CONVERT:
+            err = scan_parse_v2(path);
+            if (!err)
+            {
+                FILE * f = fopen(file,"w+");
+                print_matches(f,format);
+                fclose(f);
+            }
             break;
          case LIC_OBLIGATIONS:
             err = scanner_get_license_obligations(scanner,path);
