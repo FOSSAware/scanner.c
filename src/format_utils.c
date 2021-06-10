@@ -178,9 +178,9 @@ void match_list_free(match_data_list *list)
 void process_match(json_object_entry value)
 {
   int array_length = value.value->u.array.length;
-  match_data_list *list = calloc(1, sizeof(match_data));
-  list->match_list = calloc(1, sizeof(match_data));
-  list->count = array_length;
+  //match_data_list *list = calloc(1, sizeof(match_data));
+  //list->match_list = calloc(1, sizeof(match_data));
+  //list->count = array_length;
 
   for (int i = 0; i < array_length; i++)
   {
@@ -188,46 +188,47 @@ void process_match(json_object_entry value)
     json_object_entry *match_value = value.value->u.array.values[i]->u.object.values;
     int match_obj_len = value.value->u.array.values[i]->u.object.length;
 
-    list->match_list[i] = calloc(1, sizeof(match_data));
+   // list->match_list[i] = calloc(1, sizeof(match_data));
+    match_data * new_item = calloc(1, sizeof(match_data));
     for (int j = 0; j < match_obj_len; j++)
     {
       if (!strcmp(match_value[j].name, "vendor"))
       {
-        strcpy(list->match_list[i]->vendor, match_value[j].value->u.string.ptr);
+        strcpy(new_item->vendor, match_value[j].value->u.string.ptr);
       }
       if (!strcmp(match_value[j].name, "component"))
       {
-        strcpy(list->match_list[i]->component, match_value[j].value->u.string.ptr);
+        strcpy(new_item->component, match_value[j].value->u.string.ptr);
       }
       if (!strcmp(match_value[j].name, "version"))
       {
-        strcpy(list->match_list[i]->version, match_value[j].value->u.string.ptr);
+        strcpy(new_item->version, match_value[j].value->u.string.ptr);
       }
       if (!strcmp(match_value[j].name, "latest"))
       {
-        strcpy(list->match_list[i]->latest_version, match_value[j].value->u.string.ptr);
+        strcpy(new_item->latest_version, match_value[j].value->u.string.ptr);
       }
       if (!strcmp(match_value[j].name, "url"))
       {
-        strcpy(list->match_list[i]->url, match_value[j].value->u.string.ptr);
+        strcpy(new_item->url, match_value[j].value->u.string.ptr);
       }
       if (!strcmp(match_value[j].name, "release_date"))
       {
-         strcpy(list->match_list[i]->release_date, match_value[j].value->u.string.ptr);
+         strcpy(new_item->release_date, match_value[j].value->u.string.ptr);
       }
       if (!strcmp(match_value[j].name, "file"))
       {
-         strcpy(list->match_list[i]->filename, match_value[j].value->u.string.ptr);
+         strcpy(new_item->filename, match_value[j].value->u.string.ptr);
       } 
       if (!strcmp(match_value[j].name, "purl"))
       {
-        strcpy(list->match_list[i]->purl, match_value[j].value->u.array.values[0]->u.string.ptr);
+        strcpy(new_item->purl, match_value[j].value->u.array.values[0]->u.string.ptr);
       }
       if (!strcmp(match_value[j].name, "licenses"))
       {
         if (match_value[j].value->u.array.length > 0)
         {
-          strcpy(list->match_list[i]->license, match_value[j].value->u.array.values[0]->u.object.values->value->u.string.ptr);
+          strcpy(new_item->license, match_value[j].value->u.array.values[0]->u.object.values->value->u.string.ptr);
         }
       }   
       if (!strcmp(match_value[j].name, "lines"))
@@ -267,10 +268,12 @@ void process_match(json_object_entry value)
       }
     }
 
-    add_component(list->match_list[i]);
+    add_component(new_item);
     free(match);
+    free(new_item);
+    //list->match_list[i] = new_item;
   }
-  match_list_free(list);
+ // match_list_free(list);
 }
 
 /* Output contents of component_list in the requested format */

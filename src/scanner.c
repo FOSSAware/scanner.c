@@ -33,7 +33,6 @@
 #include <sys/time.h>
 #include <math.h>
 #include "scanner.h"
-//ggggggggggggggggggggggggggg
 #include "blacklist_ext.h"
 #include "winnowing.h"
 #include "log.h"
