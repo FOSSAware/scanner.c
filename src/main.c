@@ -126,6 +126,7 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "Usage: scanner FILE or scanner DIR\n");
                 fprintf(stderr, "Option\t\t Meaning\n");
                 fprintf(stderr, "-h\t\t Show this help\n");
+                fprintf(stderr, "-c\t\t Convert a input plain json file to the selected format [-f] in the specified output file [-o]\n");
                 fprintf(stderr, "-F<flags>\t Send engine scanning flags\n");
                 fprintf(stderr, "-f<format>\t Output format, could be: plain (default), spdx or cyclonedx.\n");
                 fprintf(stderr, "-u\t\t UMZ a MD5 hash\n");
