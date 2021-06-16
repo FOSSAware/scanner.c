@@ -176,6 +176,8 @@ int main(int argc, char *argv[])
         
         if (print_output)
             scanner_print_output(scanner);
+        if(file)
+            free(file);
 
         scanner_object_free(scanner);
 
@@ -184,5 +186,6 @@ int main(int argc, char *argv[])
         return err;
     }
     fprintf(stderr, "Missing parameter, run with -h for help\n");
+    
     return EXIT_FAILURE;
 }

@@ -159,6 +159,7 @@ void process_scan_result(json_value *result)
   for (int i = 0; i < result->u.object.length; i++)
   {
     process_match(result->u.object.values[i]);
+    log_trace("process %u/%u",i, result->u.object.length);
   }
 }
 
@@ -193,6 +194,12 @@ void process_match(json_object_entry value)
     match_data * new_item = calloc(1, sizeof(match_data));
     for (int j = 0; j < match_obj_len; j++)
     {
+      if (!strcmp(match_value[j].name, "id"))
+      {
+        if (strstr(match_value[j].value->u.string.ptr, "none"))
+          break;
+        strcpy(match->idtype, match_value[j].value->u.string.ptr);
+      }
       if (!strcmp(match_value[j].name, "vendor"))
       {
         strcpy(new_item->vendor, match_value[j].value->u.string.ptr);
@@ -248,10 +255,6 @@ void process_match(json_object_entry value)
       {
         strcpy(match->size, match_value[j].value->u.string.ptr);
       }
-      if (!strcmp(match_value[j].name, "id"))
-      {
-        strcpy(match->idtype, match_value[j].value->u.string.ptr);
-      }
       if (!strcmp(match_value[j].name, "url_hash"))
       {
         strcpy(match->md5_comp, match_value[j].value->u.string.ptr);
@@ -268,7 +271,6 @@ void process_match(json_object_entry value)
          }
       }
     }
-
     add_component(new_item);
     free(match);
     free(new_item);
