@@ -40,7 +40,6 @@ bool add_CRC(uint32_t *list, uint32_t crc)
 bool add_component(match_data *match)
 {
   /* Init component list */
-  log_debug(match->purl);
   for (int i = 0; i < CRC_LIST_LEN; i++)
   {
     if (!strcmp(component_list[i].purl, match->purl))
@@ -107,7 +106,6 @@ int scan_parse_v2(char *filename)
   json_char *json;
   json_value *value;
   f_contents *contents = scan_parse_read_file(filename);
-  log_debug(contents->contents);
   if (!contents)
   {
     log_error("There was a problem reading file: %s", filename);
