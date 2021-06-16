@@ -237,10 +237,10 @@ void process_match(json_object_entry value)
           strcpy(new_item->license, match_value[j].value->u.array.values[0]->u.object.values->value->u.string.ptr);
         }
       }   
-      if (!strcmp(match_value[j].name, "lines"))
+      /*if (!strcmp(match_value[j].name, "lines"))
       {
          strcpy(match->lines, match_value[j].value->u.string.ptr);
-      }
+      }*/
       /*if (!strcmp(match_value[j].name, "oss_lines"))
       {
          strcpy(match->oss_lines, match_value[j].value->u.string.ptr);
