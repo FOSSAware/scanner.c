@@ -14,12 +14,6 @@
 
 component_item component_list[CRC_LIST_LEN];
 
-/* Returns the CRC32C for a string */
-// uint32_t string_crc32c(char *str)
-// {
-// 	return calc_crc32c (str, strlen(str));
-// }
-
 /* Check if a crc is found in the list (add it if not) */
 bool add_CRC(uint32_t *list, uint32_t crc)
 {
@@ -61,7 +55,6 @@ bool add_component(match_data *match)
   }
   return false;
 }
-
 
 f_contents *scan_parse_read_file(char *filename)
 {
@@ -188,7 +181,7 @@ void process_match(json_object_entry value)
     json_object_entry *match_value = value.value->u.array.values[i]->u.object.values;
     int match_obj_len = value.value->u.array.values[i]->u.object.length;
 
-   // list->match_list[i] = calloc(1, sizeof(match_data));
+   // list->match_list[i] = calloc(1, sizeof(match_data)); //we dont need a match list for the moment
     match_data * new_item = calloc(1, sizeof(match_data));
     for (int j = 0; j < match_obj_len; j++)
     {

@@ -745,7 +745,7 @@ void scanner_wfp_capture(char *path, char **md5, char *wfp_buffer)
     free(src);
 }
 
-int scanner_recursive_scan(scanner_object_t * scanner)
+int scanner_recursive_scan(scanner_object_t * scanner, bool wfp_only)
 {  
     if (!scanner)
     {
@@ -802,6 +802,10 @@ int scanner_recursive_scan(scanner_object_t * scanner)
     }
 
     strcpy(scanner->status.message, "WFP_CALC_END\0"); 
+    
+    if (wfp_only)
+        return scanner->status.state;
+
     scan_request_by_chunks(scanner);
     free(scanner->wfp_path);  
 
