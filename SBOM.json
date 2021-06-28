@@ -39,6 +39,18 @@
           "id": "BSD-3-Clause"
         }
       ]
+    },
+    {
+      "type": "library",
+      "publisher": "udp",
+      "group": "udp",
+      "name": "json-parser",
+      "url": "https://github.com/udp/json-parser",
+      "licenses": [
+        {
+          "id": "BSD-2-Clause"
+        }
+      ]
     }
   ]
 }
