@@ -473,7 +473,7 @@ static int curl_request(int api_req,char * endpoint, char* data, scanner_object_
     long m_port = strtol(s->API_port, NULL, 10);
     
     asprintf(&user_session, "X-session: %s", s->API_session);
-    asprintf(&user_version, "User-Agent: SCANOSS_scanner.c/%s", VERSION);
+    asprintf(&user_version, "User-Agent: "SCANOSS_CLIENT_NAME"/"VERSION);
     asprintf(&flags,"%u",s->flags);
 
     s->curl_temp = fopen(s->curl_temp_path, "w+");
@@ -745,7 +745,7 @@ void scanner_wfp_capture(char *path, char **md5, char *wfp_buffer)
     free(src);
 }
 
-int scanner_recursive_scan(scanner_object_t * scanner)
+int scanner_recursive_scan(scanner_object_t * scanner, bool wfp_only)
 {  
     if (!scanner)
     {
@@ -802,6 +802,10 @@ int scanner_recursive_scan(scanner_object_t * scanner)
     }
 
     strcpy(scanner->status.message, "WFP_CALC_END\0"); 
+    
+    if (wfp_only)
+        return scanner->status.state;
+
     scan_request_by_chunks(scanner);
     free(scanner->wfp_path);  
 

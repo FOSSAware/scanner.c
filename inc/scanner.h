@@ -29,7 +29,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define VERSION "1.3.4"
+#define VERSION "1.3.5"
 #define MAX_HEADER_LEN 1024 * 1024 * 1024 * 10
 #define MAX_FILE_SIZE (1024 * 1024 * 4)
 #define MIN_FILE_SIZE 256
@@ -116,7 +116,7 @@ typedef struct scanner_object_t
     scanner_status_t status;
     scanner_evt_handler callback;
 } scanner_object_t;
-
+#define SCANOSS_CLIENT_NAME  "SCANOSS_cli"
 #define API_HOST_DEFAULT "osskb.org/api"
 #define API_PORT_DEFAULT "443"
 #define API_SESSION_DEFAULT "\0"
@@ -137,7 +137,7 @@ int scanner_print_output(scanner_object_t *scanner);
 void scanner_set_log_file(char *log);
 scanner_object_t * scanner_create(char * id, char * host, char * port, char * session, char * format, char * path, char * file, scanner_flags_t flag, scanner_evt_handler callback);
 void scanner_wfp_capture(char *path, char **md5, char *wfp_buffer);
-int scanner_recursive_scan(scanner_object_t *scanner);
+int scanner_recursive_scan(scanner_object_t *scanner, bool wfp_only);
 int scanner_wfp_scan(scanner_object_t * scanner);
 bool scanner_get_attribution(scanner_object_t *scanner, char * path);
 int scanner_get_file_contents(scanner_object_t *scanner, char * hash);

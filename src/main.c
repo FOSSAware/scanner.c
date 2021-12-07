@@ -28,14 +28,13 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include "scanner.h"
+#include "format_utils.h"
 
 enum
 {
     SCAN = 0,
     SCAN_WFP,
-    UMZ,
-    ATT_NOTICES,
-    LIC_OBLIGATIONS,
+    CONVERT,
 };
 
 void scanner_evt(const scanner_status_t * p_scanner, scanner_evt_t evt)
@@ -78,12 +77,13 @@ int main(int argc, char *argv[])
     char session[64] = API_SESSION_DEFAULT;
     char path[512];
     int flags = 0;
+    bool wfp_only = false;
 
-    while ((param = getopt (argc, argv, "F:H:p:f:o:L:aluwhdt")) != -1)
+    while ((param = getopt (argc, argv, "F:H:p:f:o:L:cluwWhdtv")) != -1)
         switch (param)
         {
-            case 'a':
-                proc = ATT_NOTICES;
+            case 'c':
+                proc = CONVERT;
                 break;
             case 'F':
                 flags = atol(optarg);
@@ -101,9 +101,6 @@ int main(int argc, char *argv[])
                 asprintf(&file,"%s",optarg);
                 print_output = false;
                 break;
-            case 'l':
-                proc = LIC_OBLIGATIONS;
-                break;
             case 'L':
                 scanner_set_log_file(optarg);
                 break;
@@ -113,25 +110,31 @@ int main(int argc, char *argv[])
             case 't':
                 scanner_set_log_level(0);
                 break;
-            case 'u':
-                proc = UMZ;
-                break;
             case 'w':
                 proc = SCAN_WFP;
                 break;
+            case 'W':
+                wfp_only = true;
+                break;
+            case 'v':
+                fprintf(stderr,"%s\n",VERSION);
+                exit(EXIT_FAILURE);
+                break;
             case 'h':
             default:
-                fprintf(stderr, "SCANOSS scanner-%s\n", VERSION);
+                fprintf(stderr, "SCANOSS C CLI. Ver: %s, License GPL 2.0-or-later\n", VERSION);
                 fprintf(stderr, "Usage: scanner FILE or scanner DIR\n");
                 fprintf(stderr, "Option\t\t Meaning\n");
                 fprintf(stderr, "-h\t\t Show this help\n");
-                fprintf(stderr, "-F<flags>\t Send engine scanning flags\n");
+                fprintf(stderr, "-v\t\t Show CLI version\n");
+                fprintf(stderr, "-F<flags>\t Scanning engine flags (1: disable snippet matching, 2: enable snippet ids, 4: disable dependencies,\n"
+                                              "\t\t 8: disable licenses, 16: disable copyrights, 32: disable vulnerabilities, 64: disable quality,\n"
+                                              "\t\t 128: disable cryptography,256: disable best match, 512: Report identified files)\n");
                 fprintf(stderr, "-f<format>\t Output format, could be: plain (default), spdx or cyclonedx.\n");
-                fprintf(stderr, "-a\t\t Get the attribution notices of a SBOM from a path\n");
-                fprintf(stderr, "-u\t\t UMZ a MD5 hash\n");
                 fprintf(stderr, "-w\t\t Scan a wfp file\n");
+                fprintf(stderr, "-W\t\t Create a wfp file from path\n");
                 fprintf(stderr, "-o<file_name>\t Save the scan results in the specified file\n");
-                fprintf(stderr, "-l<file_name>\t Set logs filename\n");
+                fprintf(stderr, "-L<file_name>\t Set logs filename\n");
                 fprintf(stderr, "-d\t\t Enable debug messages\n");
                 fprintf(stderr, "-t\t\t Enable trace messages, enable to see post request to the API\n");
                 fprintf(stderr, "\nFor more information, please visit https://scanoss.com\n");
@@ -150,19 +153,19 @@ int main(int argc, char *argv[])
         switch (proc)
         {
         case SCAN:
-            err = scanner_recursive_scan(scanner);
+            err = scanner_recursive_scan(scanner, wfp_only);
             break;
         case SCAN_WFP:
             err = scanner_wfp_scan(scanner);
             break;
-        case UMZ:
-            err = scanner_get_file_contents(scanner,path);
-            break;
-        case ATT_NOTICES:
-            err = scanner_get_attribution(scanner,path);
-            break;
-         case LIC_OBLIGATIONS:
-            err = scanner_get_license_obligations(scanner,path);
+        case CONVERT:
+            err = scan_parse_v2(path);
+            if (!err)
+            {
+                FILE * f = fopen(file,"w+");
+                print_matches(f,format);
+                fclose(f);
+            }
             break;
         default:
             break;
@@ -170,13 +173,16 @@ int main(int argc, char *argv[])
         
         if (print_output)
             scanner_print_output(scanner);
-
-        scanner_object_free(scanner);
+        if(file)
+            free(file);
 
         if (err)
-            fprintf(stderr, "Scanner failed, error %d\n", err);
+            fprintf(stderr, "Scanner exit with msg: %d - %s\n", err, scanner->status.message);
+        
+        scanner_object_free(scanner);
         return err;
     }
     fprintf(stderr, "Missing parameter, run with -h for help\n");
+    
     return EXIT_FAILURE;
 }

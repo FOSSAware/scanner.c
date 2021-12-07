@@ -1,10 +1,12 @@
-# scanner.c - Deprecated
+# scanner.c - DEPRECATED
 
 ** Deprecated **
 
 This project is not actively maintained.
 
-For an up-to-date API/SDK/CLI implementation, please refer to the Python CLI.[![Build Status](https://travis-ci.com/scanoss/scanner.c.svg?branch=master)](https://travis-ci.com/scanoss/scanner.c)
+For an up-to-date API/SDK/CLI implementation, please refer to the Python CLI.
+
+[![Build Status](https://travis-ci.com/scanoss/scanner.c.svg?branch=master)](https://travis-ci.com/scanoss/scanner.c)
 
 This is a simple implementation of a console file scanner using the SCANOSS OSSKB, which allows you to perform identification of Open Source components, files or even snippets in your own code. 
 

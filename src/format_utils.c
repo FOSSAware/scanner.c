@@ -14,12 +14,6 @@
 
 component_item component_list[CRC_LIST_LEN];
 
-/* Returns the CRC32C for a string */
-// uint32_t string_crc32c(char *str)
-// {
-// 	return calc_crc32c (str, strlen(str));
-// }
-
 /* Check if a crc is found in the list (add it if not) */
 bool add_CRC(uint32_t *list, uint32_t crc)
 {
@@ -40,7 +34,6 @@ bool add_CRC(uint32_t *list, uint32_t crc)
 bool add_component(match_data *match)
 {
   /* Init component list */
-  log_debug(match->purl);
   for (int i = 0; i < CRC_LIST_LEN; i++)
   {
     if (!strcmp(component_list[i].purl, match->purl))
@@ -62,7 +55,6 @@ bool add_component(match_data *match)
   }
   return false;
 }
-
 
 f_contents *scan_parse_read_file(char *filename)
 {
@@ -158,6 +150,7 @@ void process_scan_result(json_value *result)
   for (int i = 0; i < result->u.object.length; i++)
   {
     process_match(result->u.object.values[i]);
+    log_trace("process %u/%u",i, result->u.object.length);
   }
 }
 
@@ -188,10 +181,16 @@ void process_match(json_object_entry value)
     json_object_entry *match_value = value.value->u.array.values[i]->u.object.values;
     int match_obj_len = value.value->u.array.values[i]->u.object.length;
 
-   // list->match_list[i] = calloc(1, sizeof(match_data));
+   // list->match_list[i] = calloc(1, sizeof(match_data)); //we dont need a match list for the moment
     match_data * new_item = calloc(1, sizeof(match_data));
     for (int j = 0; j < match_obj_len; j++)
     {
+      if (!strcmp(match_value[j].name, "id"))
+      {
+        if (strstr(match_value[j].value->u.string.ptr, "none"))
+          break;
+        strcpy(match->idtype, match_value[j].value->u.string.ptr);
+      }
       if (!strcmp(match_value[j].name, "vendor"))
       {
         strcpy(new_item->vendor, match_value[j].value->u.string.ptr);
@@ -231,14 +230,14 @@ void process_match(json_object_entry value)
           strcpy(new_item->license, match_value[j].value->u.array.values[0]->u.object.values->value->u.string.ptr);
         }
       }   
-      if (!strcmp(match_value[j].name, "lines"))
+      /*if (!strcmp(match_value[j].name, "lines"))
       {
          strcpy(match->lines, match_value[j].value->u.string.ptr);
-      }
-      if (!strcmp(match_value[j].name, "oss_lines"))
+      }*/
+      /*if (!strcmp(match_value[j].name, "oss_lines"))
       {
          strcpy(match->oss_lines, match_value[j].value->u.string.ptr);
-      }
+      }*/ //<---- was commented due to a bug on mac.
       if (!strcmp(match_value[j].name, "matched"))
       {
          strcpy(match->matched, match_value[j].value->u.string.ptr);
@@ -246,10 +245,6 @@ void process_match(json_object_entry value)
       if (!strcmp(match_value[j].name, "size"))
       {
         strcpy(match->size, match_value[j].value->u.string.ptr);
-      }
-      if (!strcmp(match_value[j].name, "id"))
-      {
-        strcpy(match->idtype, match_value[j].value->u.string.ptr);
       }
       if (!strcmp(match_value[j].name, "url_hash"))
       {
@@ -267,7 +262,6 @@ void process_match(json_object_entry value)
          }
       }
     }
-
     add_component(new_item);
     free(match);
     free(new_item);

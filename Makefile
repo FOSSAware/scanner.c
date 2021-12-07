@@ -1,15 +1,12 @@
 CC=gcc
-WIN64CC=x86_64-w64-mingw32-gcc
 # Enable all compiler warnings. 
 CCFLAGS+= -fPIC -g -Wall -Werror -std=gnu99 -I./inc -I./external/inc
 
 # Linker flags
 LDFLAGS+=-lpthread -lcrypto -lssl -lcurl -lm
-LDFLAGS_WIN64+=-L/home/osboxes/scanoss/curl-7.76.1/lib -L/usr/local/lib/ -lpthread -lcrypto -lssl -lcurl -lm
-
 LIBFLAGS=-O -g -Wall -std=gnu99 -fPIC -c
 
-VERSION=`./scanner -h 2>&1  | head -n 1 | cut -d"-" -f2`
+VERSION=`./scanner -v 2>&1  | head -n 1`
 
 SOURCES_SCANNER=$(wildcard src/*.c) $(wildcard src/**/*.c)  $(wildcard external/*.c) $(wildcard external/**/*.c)
 OBJECTS_SCANNER=$(SOURCES_SCANNER:.c=.o)
@@ -18,7 +15,6 @@ SOURCES_LIB=$(filter-out src/main.c, $(SOURCES_SCANNER))
 OBJECTS_LIB=$(SOURCES_LIB:.c=.o)
 
 TARGET_SCANNER=scanner
-TARGET_SCANNER_WIN64=scanner_win64
 TARGET_LIB=lib
 TARGET_NOINTEL=no_intel
 
@@ -67,10 +63,10 @@ deb: $(TARGET_SCANNER) $(TARGET_LIB)
 	@mkdir -p dist/debian/usr/lib
 	@mkdir -p dist/debian/usr/bin
 	cat packages/debian/control | sed "s/%VERSION%/$(VERSION)/" > dist/debian/DEBIAN/control
-	@cp -vax $(TARGET_SCANNER) dist/debian/usr/bin
+	@cp -vax $(BIN_NAME) dist/debian/usr/bin
 	@cp -vax $(EXPORTED_HEADERS) dist/debian/usr/include/scanoss
 	@cp -vax $(LIB_NAME) dist/debian/usr/lib
 	dpkg-deb --build dist/debian
-	mv dist/debian.deb dist/scanoss-scanner-$(VERSION)-amd64.deb
+	mv dist/debian.deb dist/scanoss-cli-$(VERSION)-amd64.deb
 	
 
