@@ -68,4 +68,4 @@ $ scanner mz.c
 
 # License
 
-scanner.c is released under the GPL 2.0 license. Please check the LICENSE file for further details.
+scanner.c is released under the MIT license. Please check the LICENSE file for further details.
